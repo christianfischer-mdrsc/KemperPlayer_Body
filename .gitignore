@@ -1,0 +1,17 @@
+# STM32CubeIDE Build-Ausgaben
+Debug/
+Release/
+*.o
+*.d
+*.su
+*.elf
+*.map
+*.list
+*.hex
+*.bin
+
+# IDE-lokale Dateien
+.metadata/
+*.launch
+.DS_Store
+Thumbs.db
