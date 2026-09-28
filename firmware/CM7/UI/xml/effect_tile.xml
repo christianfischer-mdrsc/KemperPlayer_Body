@@ -1,0 +1,49 @@
+<!--
+  effect_tile.xml
+  Wiederverwendbare Komponente: eine Effekt-Kachel der Live-Ansicht.
+  Verwendung:  <effect_tile slot="C" name="Green Scream" state="ON" color="#c_dist" state_color="#c_dist"/>
+  Eingeschaltet: color und state_color in der Effektfarbe.
+  Ausgeschaltet: color="#line", state="OFF", name_color="#text3".
+-->
+<component>
+  <api>
+    <prop name="slot"   type="string" default="A"/>
+    <prop name="name"   type="string" default="Effekt"/>
+    <prop name="state"  type="string" default="ON"/>
+    <prop name="color"  type="color"  default="#c_comp"/>
+    <prop name="state_color" type="color" default="#text3"/>
+    <prop name="name_color"  type="color" default="#text"/>
+  </api>
+
+  <styles>
+    <style name="main"
+           bg_color="#tile"
+           radius="#radius"
+           border_width="2"
+           pad_all="6"
+           pad_row="6"/>
+  </styles>
+
+  <view extends="lv_obj" scrollable="false"
+        width="1" flex_grow="1" height="176"
+        flex_flow="column"
+        style_border_color="$color">
+    <style name="main"/>
+
+    <!-- Slot-Buchstabe oben (Platz fuer Icon rechts daneben) -->
+    <lv_label text="$slot"
+              style_text_color="$state_color"
+              style_text_font="lv_font_montserrat_22"/>
+
+    <!-- Effektname, bricht bei Bedarf in zwei Zeilen um -->
+    <lv_label text="$name" width="100%" flex_grow="1"
+              long_mode="wrap"
+              style_text_color="$name_color"
+              style_text_font="lv_font_montserrat_16"/>
+
+    <!-- ON / OFF -->
+    <lv_label text="$state"
+              style_text_color="$state_color"
+              style_text_font="lv_font_montserrat_20"/>
+  </view>
+</component>
