@@ -1,0 +1,55 @@
+<!--
+  edit_tile.xml
+  Effekt-Kachel der Bearbeiten-Ansicht: etwas kleiner als in der
+  Live-Ansicht, mit ON/OFF als farbigem Feld.
+  Verwendung eingeschaltet:
+    <edit_tile slot="C" name="Green Scream" color="#c_dist"
+               state="ON" pill_bg="#c_dist" pill_text="#bg" slot_color="#c_dist"/>
+  Ausgeschaltet:
+    <edit_tile slot="B" name="Wah Wah" color="#line" state="OFF"/>
+-->
+<component>
+  <api>
+    <prop name="slot"       type="string" default="A"/>
+    <prop name="name"       type="string" default="Effekt"/>
+    <prop name="state"      type="string" default="OFF"/>
+    <prop name="color"      type="color"  default="#line"/>
+    <prop name="slot_color" type="color"  default="#text3"/>
+    <prop name="name_color" type="color"  default="#text3"/>
+    <prop name="pill_bg"    type="color"  default="0x2a2d31"/>
+    <prop name="pill_text"  type="color"  default="0x9aa1ab"/>
+  </api>
+
+  <styles>
+    <style name="main"
+           bg_color="#tile"
+           radius="8"
+           border_width="2"
+           pad_all="6"
+           pad_row="4"/>
+  </styles>
+
+  <view extends="lv_obj" scrollable="false"
+        width="1" flex_grow="1" height="140"
+        flex_flow="column"
+        style_border_color="$color">
+    <style name="main"/>
+
+    <lv_label text="$slot"
+              style_text_color="$slot_color"
+              style_text_font="lv_font_montserrat_16"/>
+
+    <lv_label text="$name" width="100%" flex_grow="1" long_mode="wrap"
+              style_text_color="$name_color"
+              style_text_font="lv_font_montserrat_14"/>
+
+    <!-- ON/OFF-Feld -->
+    <lv_obj width="content" height="content" scrollable="false"
+            style_bg_color="$pill_bg" style_border_width="0"
+            style_radius="4" style_pad_hor="8" style_pad_ver="3">
+      <lv_label text="$state"
+                style_text_color="$pill_text"
+                style_text_font="lv_font_montserrat_14"/>
+    </lv_obj>
+  </view>
+</component>

@@ -1,0 +1,37 @@
+<!--
+  section_button.xml
+  Bereichs-Button der Bearbeiten-Ansicht (RIG, INPUT, AMP ...).
+  icon: Symbol aus der Montserrat-Schrift (LVGL-Symbole, z. B. &#xF013; fuer Zahnrad).
+        Spaeter durch eigene Bilder (lv_image) ersetzbar.
+  Verwendung:  <section_button icon="&#xF013;" label="SYSTEM"/>
+-->
+<component>
+  <api>
+    <prop name="icon"  type="string" default="&#xF013;"/>
+    <prop name="label" type="string" default="RIG"/>
+  </api>
+
+  <styles>
+    <style name="main"
+           bg_color="#tile"
+           border_color="0x454b53"
+           border_width="1"
+           radius="8"
+           pad_all="0"
+           pad_row="3"/>
+  </styles>
+
+  <view extends="lv_obj" width="60" height="52" scrollable="false"
+        flex_flow="column"
+        style_flex_main_place="center"
+        style_flex_cross_place="center"
+        style_flex_track_place="center">
+    <style name="main"/>
+    <lv_label text="$icon"
+              style_text_color="0xcfd6df"
+              style_text_font="lv_font_montserrat_20"/>
+    <lv_label text="$label"
+              style_text_color="#text2"
+              style_text_font="lv_font_montserrat_12"/>
+  </view>
+</component>

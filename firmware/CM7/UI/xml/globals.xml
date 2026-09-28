@@ -1,0 +1,34 @@
+<!--
+  globals.xml
+  Projektweite Farben und Konstanten fuer das Kemper-Display.
+  Referenz in anderen Dateien ueber #name, z. B. style_bg_color="#bg".
+-->
+<globals>
+  <consts>
+    <!-- Hintergrund und Flaechen (Nachtmodus) -->
+    <color name="bg"        value="0x141517"/>
+    <color name="tile"      value="0x1d1f22"/>
+    <color name="line"      value="0x2c2f34"/>
+    <color name="text"      value="0xeceef1"/>
+    <color name="text2"     value="0xa3aab4"/>
+    <color name="text3"     value="0x8b929c"/>
+    <color name="accent"    value="0x7fb4f5"/>
+    <color name="sel_bg"    value="0x1b4a86"/>
+    <color name="sel_line"  value="0x4a93e8"/>
+
+    <!-- Effektfarben -->
+    <color name="c_comp"    value="0x3cc3d6"/>
+    <color name="c_wah"     value="0xf08a24"/>
+    <color name="c_dist"    value="0xe5483d"/>
+    <color name="c_eq"      value="0xe8c93a"/>
+    <color name="c_stack"   value="0xb8bec7"/>
+    <color name="c_pitch"   value="0xa58af0"/>
+    <color name="c_mod"     value="0x4a93e8"/>
+    <color name="c_dly"     value="0x46c26b"/>
+    <color name="c_rev"     value="0x2fb3a0"/>
+
+    <!-- Masse -->
+    <px name="radius"       value="10"/>
+    <px name="gap"          value="6"/>
+  </consts>
+</globals>

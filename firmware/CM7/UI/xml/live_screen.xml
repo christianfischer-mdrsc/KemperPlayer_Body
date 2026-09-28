@@ -1,0 +1,96 @@
+<!--
+  live_screen.xml
+  Live-Ansicht (Spielen) des Kemper-Displays, 1024 x 600.
+  Nur Darstellung, keine Funktion. Nutzt die Komponenten
+  effect_tile und fs_button sowie die Farben aus globals.xml.
+-->
+<screen>
+  <view width="1024" height="600" scrollable="false"
+        flex_flow="column"
+        style_bg_color="#bg"
+        style_pad_all="8"
+        style_pad_row="6">
+
+    <!-- Kopfzeile: Performance, Tempo, Bearbeiten -->
+    <lv_obj width="100%" height="content"
+            flex_flow="row" style_flex_cross_place="center" style_flex_track_place="center" scrollable="false"
+            style_bg_opa="0" style_border_width="0" style_pad_all="0"
+            style_pad_column="16">
+      <lv_label text="012"
+                style_text_color="#accent"
+                style_text_font="lv_font_montserrat_28"/>
+      <lv_label text="Sunday Set"
+                style_text_color="#text"
+                style_text_font="lv_font_montserrat_28"/>
+
+      <!-- Abstandhalter -->
+      <lv_obj height="1" width="1" flex_grow="1"
+              style_bg_opa="0" style_border_width="0"/>
+
+      <lv_obj width="content" height="48"
+              flex_flow="row" style_flex_cross_place="center" style_flex_track_place="center" scrollable="false"
+              style_bg_color="#tile" style_border_color="#line" style_border_width="1"
+              style_radius="10" style_pad_hor="14" style_pad_ver="0" style_pad_column="10">
+        <lv_obj width="14" height="14" style_radius="7"
+                style_bg_color="#c_dist" style_border_width="0"/>
+        <lv_label text="120 BPM"
+                  style_text_color="#text"
+                  style_text_font="lv_font_montserrat_24"/>
+      </lv_obj>
+
+      <lv_button height="48" style_bg_color="#tile"
+                 style_border_color="#line" style_border_width="1"
+                 style_radius="10" style_shadow_width="0">
+        <lv_label text="Bearbeiten" align="center"
+                  style_text_color="#text2"
+                  style_text_font="lv_font_montserrat_18"/>
+      </lv_button>
+    </lv_obj>
+
+    <!-- Slot und Rig-Name -->
+    <lv_label text="Slot 3"
+              style_pad_left="12"
+              style_text_color="#text3"
+              style_text_font="lv_font_montserrat_20"/>
+    <lv_label text="65 Deluxe 2.0 LQD N" width="100%" height="60" long_mode="dots"
+              style_pad_left="12"
+              style_text_color="#text"
+              style_text_font="lv_font_montserrat_48"/>
+
+    <!-- Freiraum drueckt Kacheln und Footswitches nach unten -->
+    <lv_obj width="100%" height="1" flex_grow="1" scrollable="false" style_bg_opa="0" style_border_width="0"/>
+
+    <!-- Effektkette -->
+    <lv_obj width="100%" height="content" scrollable="false"
+            flex_flow="row"
+            style_bg_opa="0" style_border_width="0" style_pad_all="0"
+            style_pad_column="#gap">
+      <effect_tile slot="A"     name="Compressor"     state="ON"  color="#c_comp" state_color="#c_comp"/>
+      <effect_tile slot="B"     name="Wah Wah"        state="OFF" color="#line" name_color="#text3"/>
+      <effect_tile slot="C"     name="Green Scream"   state="ON"  color="#c_dist" state_color="#c_dist"/>
+      <effect_tile slot="D"     name="Studio EQ"      state="OFF" color="#line" name_color="#text3"/>
+      <effect_tile slot="STACK" name="Amp"            state="ON"  color="#c_stack" state_color="#c_stack"/>
+      <effect_tile slot="X"     name="Pitch Shifter"  state="OFF" color="#line" name_color="#text3"/>
+      <effect_tile slot="MOD"   name="Vintage Chorus" state="ON"  color="#c_mod" state_color="#c_mod"/>
+      <effect_tile slot="DLY"   name="Dual Delay"     state="ON"  color="#c_dly" state_color="#c_dly"/>
+      <effect_tile slot="REV"   name="Natural Hall"   state="ON"  color="#c_rev" state_color="#c_rev"/>
+    </lv_obj>
+
+    <!-- Abstand zwischen Stomps und Footswitch-Feldern -->
+    <lv_obj width="100%" height="28" scrollable="false" style_bg_opa="0" style_border_width="0"/>
+
+    <!-- Footswitch-Leiste FS1 bis FS6 -->
+    <lv_obj width="100%" height="content" scrollable="false"
+            flex_flow="row"
+            style_bg_opa="0" style_border_width="0" style_pad_all="0"
+            style_pad_column="#gap">
+      <fs_button fs="FS1" label="Clean Twin"     sub="Slot 1"/>
+      <fs_button fs="FS2" label="Plexi Crunch"   sub="Slot 2"/>
+      <fs_button fs="FS3" label="65 Deluxe 2.0"  sub="Slot 3"
+                 bg="#sel_bg" border="#sel_line"/>
+      <fs_button fs="FS4" label="Lead Mars 800"  sub="Slot 4"/>
+      <fs_button fs="FS5" label="Ambient Swell"  sub="Slot 5"/>
+      <fs_button fs="FS6" label="Stomps"         sub="Modus"/>
+    </lv_obj>
+  </view>
+</screen>
