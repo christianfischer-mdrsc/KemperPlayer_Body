@@ -57,7 +57,8 @@ lv_obj_t * ui_edit_create(void);
 /**
  * Erzeugt Live- und Bearbeiten-Ansicht, verbindet die Buttons
  * "Bearbeiten" und "Play" zum Umschalten und zeigt die Live-Ansicht.
- * Nach lv_init() und der Display-Initialisierung aufrufen.
+ * Laeuft gerade der Startbildschirm (ui_boot_create()), wird dieser
+ * abgeschlossen und danach zur Live-Ansicht uebergeblendet.
  */
 void ui_start(void);
 
