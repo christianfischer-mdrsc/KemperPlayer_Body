@@ -15,6 +15,8 @@
     <color name="accent"    value="0x7fb4f5"/>
     <color name="sel_bg"    value="0x1b4a86"/>
     <color name="sel_line"  value="0x4a93e8"/>
+    <color name="bar_bg"    value="0x1a1c1f"/>
+    <color name="usb_on"    value="0x3ddc84"/>
 
     <!-- Effektfarben -->
     <color name="c_comp"    value="0x3cc3d6"/>

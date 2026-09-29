@@ -4,9 +4,11 @@
  *
  * Benoetigte Fonts in lv_conf.h:
  *   LV_FONT_MONTSERRAT_12, _14, _16, _18, _20, _22, _24, _28, _48
+ * Statusleiste (USB, Datum, Uhrzeit) oben: siehe ui_statusbar.c
  */
 #include "ui_live.h"
 #include "ui_boot.h"
+#include "ui_statusbar.h"
 
 /* Buttons zum Umschalten zwischen Live- und Bearbeiten-Ansicht */
 static lv_obj_t * s_btn_to_edit;
@@ -104,18 +106,42 @@ static lv_obj_t * fs_button(lv_obj_t * parent, const char * fs,
 /* -------------------------------------------------------------------------
  * Screen
  * ---------------------------------------------------------------------- */
-lv_obj_t * ui_live_create(void)
+
+/* Screen mit Statusleiste oben. Liefert den Inhaltsbereich darunter
+ * (Spalte, 8 px Rand, 6 px Zeilenabstand), in den die Ansicht gebaut wird. */
+static lv_obj_t * screen_with_statusbar(lv_obj_t ** body)
 {
     lv_obj_t * scr = lv_obj_create(NULL);
     lv_obj_set_size(scr, 1024, 600);
     lv_obj_set_style_bg_color(scr, lv_color_hex(UI_COL_BG), 0);
-    lv_obj_set_style_pad_all(scr, 8, 0);
-    lv_obj_set_style_pad_row(scr, 6, 0);
+    lv_obj_set_style_pad_all(scr, 0, 0);
+    lv_obj_set_style_pad_row(scr, 0, 0);
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
+    ui_statusbar_create(scr);
+
+    lv_obj_t * b = lv_obj_create(scr);
+    lv_obj_set_width(b, LV_PCT(100));
+    lv_obj_set_flex_grow(b, 1);
+    lv_obj_set_flex_flow(b, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_bg_opa(b, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(b, 0, 0);
+    lv_obj_set_style_radius(b, 0, 0);
+    lv_obj_set_style_pad_all(b, 8, 0);
+    lv_obj_set_style_pad_row(b, 6, 0);
+    lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
+    *body = b;
+    return scr;
+}
+
+lv_obj_t * ui_live_create(void)
+{
+    lv_obj_t * body;
+    lv_obj_t * scr = screen_with_statusbar(&body);
+
     /* Kopfzeile ------------------------------------------------------- */
-    lv_obj_t * head = plain_row(scr, 16);
+    lv_obj_t * head = plain_row(body, 16);
     lv_obj_set_flex_align(head, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
     label(head, "012", UI_COL_ACCENT, &lv_font_montserrat_28);
@@ -161,17 +187,17 @@ lv_obj_t * ui_live_create(void)
     lv_obj_center(el);
 
     /* Slot und Rig-Name ----------------------------------------------- */
-    lv_obj_t * slot = label(scr, "Slot 3", UI_COL_TEXT3, &lv_font_montserrat_20);
+    lv_obj_t * slot = label(body, "Slot 3", UI_COL_TEXT3, &lv_font_montserrat_20);
     lv_obj_set_style_pad_left(slot, 12, 0);
 
-    lv_obj_t * rig = label(scr, "65 Deluxe 2.0 LQD N", UI_COL_TEXT,
+    lv_obj_t * rig = label(body, "65 Deluxe 2.0 LQD N", UI_COL_TEXT,
                            &lv_font_montserrat_48);
     lv_obj_set_size(rig, LV_PCT(100), 60);
     lv_obj_set_style_pad_left(rig, 12, 0);
     lv_label_set_long_mode(rig, LV_LABEL_LONG_DOT);
 
     /* Freiraum --------------------------------------------------------- */
-    lv_obj_t * grow = lv_obj_create(scr);
+    lv_obj_t * grow = lv_obj_create(body);
     lv_obj_set_size(grow, LV_PCT(100), 1);
     lv_obj_set_flex_grow(grow, 1);
     lv_obj_set_style_bg_opa(grow, LV_OPA_TRANSP, 0);
@@ -179,7 +205,7 @@ lv_obj_t * ui_live_create(void)
     lv_obj_remove_flag(grow, LV_OBJ_FLAG_SCROLLABLE);
 
     /* Effektkette ------------------------------------------------------ */
-    lv_obj_t * chain = plain_row(scr, 6);
+    lv_obj_t * chain = plain_row(body, 6);
     effect_tile(chain, "A",     "Compressor",     true,  UI_COL_COMP);
     effect_tile(chain, "B",     "Wah Wah",        false, UI_COL_WAH);
     effect_tile(chain, "C",     "Green Scream",   true,  UI_COL_DIST);
@@ -191,14 +217,14 @@ lv_obj_t * ui_live_create(void)
     effect_tile(chain, "REV",   "Natural Hall",   true,  UI_COL_REV);
 
     /* Abstand zwischen Stomps und Footswitch-Feldern ------------------ */
-    lv_obj_t * gap = lv_obj_create(scr);
+    lv_obj_t * gap = lv_obj_create(body);
     lv_obj_set_size(gap, LV_PCT(100), 28);
     lv_obj_set_style_bg_opa(gap, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(gap, 0, 0);
     lv_obj_remove_flag(gap, LV_OBJ_FLAG_SCROLLABLE);
 
     /* Footswitch-Leiste ------------------------------------------------ */
-    lv_obj_t * fs = plain_row(scr, 6);
+    lv_obj_t * fs = plain_row(body, 6);
     fs_button(fs, "FS1", "Clean Twin",    "Slot 1", false);
     fs_button(fs, "FS2", "Plexi Crunch",  "Slot 2", false);
     fs_button(fs, "FS3", "65 Deluxe 2.0", "Slot 3", true);
@@ -294,16 +320,11 @@ static lv_obj_t * spacer(lv_obj_t * parent, int32_t w, int32_t h, bool grow)
 
 lv_obj_t * ui_edit_create(void)
 {
-    lv_obj_t * scr = lv_obj_create(NULL);
-    lv_obj_set_size(scr, 1024, 600);
-    lv_obj_set_style_bg_color(scr, lv_color_hex(UI_COL_BG), 0);
-    lv_obj_set_style_pad_all(scr, 8, 0);
-    lv_obj_set_style_pad_row(scr, 6, 0);
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_t * body;
+    lv_obj_t * scr = screen_with_statusbar(&body);
 
     /* Kopfzeile ------------------------------------------------------- */
-    lv_obj_t * head = plain_row(scr, 6);
+    lv_obj_t * head = plain_row(body, 6);
     lv_obj_set_flex_align(head, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     lv_obj_t * badge = lv_obj_create(head);
@@ -335,20 +356,20 @@ lv_obj_t * ui_edit_create(void)
     section_button(head, LV_SYMBOL_BELL,       "TUNER");
 
     /* Slot, Rig-Name, Amp und Cab ------------------------------------- */
-    lv_obj_t * sl = label(scr, "Slot 3", UI_COL_ACCENT, &lv_font_montserrat_16);
+    lv_obj_t * sl = label(body, "Slot 3", UI_COL_ACCENT, &lv_font_montserrat_16);
     lv_obj_set_style_pad_left(sl, 12, 0);
-    lv_obj_t * rig = label(scr, "65 Deluxe 2.0 LQD N", UI_COL_TEXT, &lv_font_montserrat_48);
+    lv_obj_t * rig = label(body, "65 Deluxe 2.0 LQD N", UI_COL_TEXT, &lv_font_montserrat_48);
     lv_obj_set_size(rig, LV_PCT(100), 56);
     lv_obj_set_style_pad_left(rig, 12, 0);
     lv_label_set_long_mode(rig, LV_LABEL_LONG_DOT);
-    lv_obj_t * ac = label(scr, "Amp: Deluxe Reverb   /   Cab: 1x12 Jensen", UI_COL_TEXT2,
+    lv_obj_t * ac = label(body, "Amp: Deluxe Reverb   /   Cab: 1x12 Jensen", UI_COL_TEXT2,
                           &lv_font_montserrat_16);
     lv_obj_set_style_pad_left(ac, 12, 0);
 
-    spacer(scr, LV_PCT(100), 1, true);
+    spacer(body, LV_PCT(100), 1, true);
 
     /* Effektkette ------------------------------------------------------ */
-    lv_obj_t * chain = plain_row(scr, 6);
+    lv_obj_t * chain = plain_row(body, 6);
     edit_tile(chain, "A",     "Compressor",     true,  UI_COL_COMP);
     edit_tile(chain, "B",     "Wah Wah",        false, UI_COL_WAH);
     edit_tile(chain, "C",     "Green Scream",   true,  UI_COL_DIST);
@@ -359,8 +380,8 @@ lv_obj_t * ui_edit_create(void)
     edit_tile(chain, "DLY",   "Dual Delay",     true,  UI_COL_DLY);
     edit_tile(chain, "REV",   "Natural Hall",   true,  UI_COL_REV);
 
-    /* Morph, Tempo, USB ------------------------------------------------ */
-    lv_obj_t * mr = plain_row(scr, 14);
+    /* Morph und Tempo ------------------------------------------------ */
+    lv_obj_t * mr = plain_row(body, 14);
     lv_obj_set_height(mr, 44);
     lv_obj_set_style_pad_hor(mr, 12, 0);
     lv_obj_set_flex_align(mr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -396,12 +417,10 @@ lv_obj_t * ui_edit_create(void)
     lv_obj_set_style_border_width(led, 0, 0);
     label(bpm, "120 BPM", UI_COL_TEXT, &lv_font_montserrat_18);
 
-    label(mr, LV_SYMBOL_USB " USB", UI_COL_DLY, &lv_font_montserrat_14);
-
     /* Abstand und Footswitch-Leiste ------------------------------------ */
-    spacer(scr, LV_PCT(100), 10, false);
+    spacer(body, LV_PCT(100), 10, false);
 
-    lv_obj_t * fs = plain_row(scr, 6);
+    lv_obj_t * fs = plain_row(body, 6);
     fs_button(fs, "FS1", "Clean Twin",    "Slot 1", false);
     fs_button(fs, "FS2", "Plexi Crunch",  "Slot 2", false);
     fs_button(fs, "FS3", "65 Deluxe 2.0", "Slot 3", true);
