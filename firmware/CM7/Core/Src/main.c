@@ -44,6 +44,7 @@
 /* USER CODE BEGIN Includes */
 #include "lvgl/lvgl.h"
 #include "ui_live.h"
+#include "ui_boot.h"
 #include "lvgl_port_touch.h"
 #include "lvgl_port_display.h"
 
@@ -193,11 +194,31 @@ Error_Handler();
   lv_init();
   lv_tick_set_cb(HAL_GetTick);
 
-  /* initialize display and touchscreen */
+  /* Display starten und sofort den Startbildschirm zeigen.
+   * Die LVGL-Schleife laeuft erst spaeter im FreeRTOS-Task, deshalb nach
+   * jedem Schritt lv_refr_now(), damit der Fortschritt sichtbar wird. */
   lvgl_display_init();
-  lvgl_touchscreen_init();
+  ui_boot_create();
+  ui_boot_step(0, NULL);                        /* Display */
+  lv_refr_now(NULL);
 
-  /* Kemper-Display-Oberflaeche (Live- und Bearbeiten-Ansicht) */
+  lvgl_touchscreen_init();
+  ui_boot_step(1, NULL);                        /* Touch */
+  lv_refr_now(NULL);
+
+  /* TODO: Einstellungen aus dem Flash laden */
+  ui_boot_step(2, NULL);                        /* Speicher */
+  lv_refr_now(NULL);
+
+  /* TODO: USB-MIDI starten (Schritt 3) und Kemper verbinden (Schritt 4).
+   * Bis das implementiert ist, werden die Schritte nur kurz angezeigt. */
+  ui_boot_step(3, "USB-MIDI folgt");
+  lv_refr_now(NULL);
+  ui_boot_step(4, "Kemper-Verbindung folgt");
+  lv_refr_now(NULL);
+
+  /* Oberflaeche aufbauen; schliesst den Startbildschirm ab und blendet
+   * nach kurzer Pause zur Live-Ansicht ueber */
   ui_start();
 
   /* pwm */

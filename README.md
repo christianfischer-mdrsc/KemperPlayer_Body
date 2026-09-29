@@ -14,6 +14,12 @@ Eigenbau-Controller für den **Kemper Profiler Player**: 7"-Touch-Display (River
 
 Beide Bilder sind echte Renderings aus LVGL mit genau dem Code in diesem Repository.
 
+**Startbildschirm** mit Fortschritt und gemessener Bootzeit:
+
+![Startbildschirm beim Laden](docs/images/vorschau_start_laden.png)
+
+![Startbildschirm fertig](docs/images/vorschau_start_fertig.png)
+
 ## Interaktiver HTML-Prototyp
 
 Im Ordner [`prototype/`](prototype/) liegt die komplette Bedienoberfläche als HTML zum Ausprobieren, inklusive Performance-Browser, Bank-Übersicht, Effekt-Details, Tuner, Einstellungen, Stomp-Belegung und Morph:
@@ -42,16 +48,17 @@ Basis ist der offizielle LVGL-Port für das Riverdi-7"-Display ([lvgl/lv_port_ri
 4. **Project → Build Project** (für beste Leistung Konfiguration *Release*)
 5. Display mit Netzteil versorgen, Debugger an den SWD-Anschluss, dann **Run** zum Flashen
 
-Auf dem Display startet die Live-Ansicht. Über **Bearbeiten** oben rechts wechselst du in die Bearbeiten-Ansicht, über den blauen **Play-Button** zurück. Sonst hat die Oberfläche noch keine Funktion.
+Beim Einschalten erscheint der Startbildschirm und zeigt Fortschritt und Bootzeit (Millisekunden seit Reset). Danach blendet er zur Live-Ansicht über. Über **Bearbeiten** oben rechts wechselst du in die Bearbeiten-Ansicht, über den blauen **Play-Button** zurück. Sonst hat die Oberfläche noch keine Funktion.
 
 ## Aufbau des Repositorys
 
 ```
 firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 ├── CM7/UI/                   Kemper-Oberfläche
+│   ├── ui_boot.c / .h        Startbildschirm mit Fortschritt und Bootzeit
 │   ├── ui_live.c / .h        Live- und Bearbeiten-Ansicht in C (ui_start())
 │   └── xml/                  Dieselben Ansichten als LVGL-XML (Referenz)
-├── CM7/Core/Src/main.c       ruft ui_start() auf
+├── CM7/Core/Src/main.c       Startbildschirm, Init-Schritte, dann ui_start()
 ├── Middlewares/Third_Party/LVGL/lv_conf.h   Fonts aktiviert, Demos aus
 └── STM32CubeIDE/             Projektdateien (CM7 und CM4)
 prototype/                    Interaktiver HTML-Prototyp

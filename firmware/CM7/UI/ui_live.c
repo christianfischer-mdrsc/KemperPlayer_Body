@@ -6,6 +6,7 @@
  *   LV_FONT_MONTSERRAT_12, _14, _16, _18, _20, _22, _24, _28, _48
  */
 #include "ui_live.h"
+#include "ui_boot.h"
 
 /* Buttons zum Umschalten zwischen Live- und Bearbeiten-Ansicht */
 static lv_obj_t * s_btn_to_edit;
@@ -433,7 +434,11 @@ void ui_start(void)
     s_scr_edit = ui_edit_create();
     lv_obj_add_event_cb(s_btn_to_edit, to_edit_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_btn_to_live, to_live_cb, LV_EVENT_CLICKED, NULL);
-    lv_screen_load(s_scr_live);
+
+    /* Startbildschirm abschliessen (Bootzeit stoppen, danach Ueberblendung).
+     * Ohne vorherigen ui_boot_create() wird die Live-Ansicht direkt geladen. */
+    if (ui_boot_is_active()) ui_boot_finish(s_scr_live);
+    else                     lv_screen_load(s_scr_live);
 }
 
 /* -------------------------------------------------------------------------
