@@ -21,6 +21,38 @@
 #include "rtc.h"
 
 /* USER CODE BEGIN 0 */
+#include <string.h>
+#include "ui_statusbar.h"
+
+/* Merker im Backup-Register: Uhr wurde schon einmal gestellt */
+#define RTC_SET_MAGIC  0x4B504C31u   /* "KPL1" */
+
+/* Stellt die Uhr auf den Zeitpunkt des Builds (__DATE__ / __TIME__),
+ * damit nach dem ersten Flashen eine plausible Zeit angezeigt wird. */
+static void rtc_set_from_build_time(void)
+{
+    static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+    const char * d = __DATE__;               /* "Sep 29 2026" */
+    const char * t = __TIME__;               /* "12:43:07"    */
+    RTC_DateTypeDef date = {0};
+    RTC_TimeTypeDef time = {0};
+    char mon[4] = { d[0], d[1], d[2], 0 };
+    const char * m = strstr(months, mon);
+
+    date.Month   = (uint8_t)(m ? (m - months) / 3 + 1 : 1);
+    date.Date    = (uint8_t)((d[4] == ' ' ? 0 : d[4] - '0') * 10 + (d[5] - '0'));
+    date.Year    = (uint8_t)((d[9] - '0') * 10 + (d[10] - '0'));
+    date.WeekDay = RTC_WEEKDAY_MONDAY;       /* wird von der Anzeige selbst berechnet */
+    time.Hours   = (uint8_t)((t[0] - '0') * 10 + (t[1] - '0'));
+    time.Minutes = (uint8_t)((t[3] - '0') * 10 + (t[4] - '0'));
+    time.Seconds = (uint8_t)((t[6] - '0') * 10 + (t[7] - '0'));
+
+    if (HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN) == HAL_OK &&
+        HAL_RTC_SetDate(&hrtc, &date, RTC_FORMAT_BIN) == HAL_OK)
+    {
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, RTC_SET_MAGIC);
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -60,6 +92,10 @@ void MX_RTC_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
+  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != RTC_SET_MAGIC)
+  {
+    rtc_set_from_build_time();
+  }
 
   /* USER CODE END RTC_Init 2 */
 
@@ -109,5 +145,24 @@ void HAL_RTC_MspDeInit(RTC_HandleTypeDef* rtcHandle)
 }
 
 /* USER CODE BEGIN 1 */
+
+/* Zeitquelle fuer die Statusleiste (ueberschreibt die schwache Funktion) */
+bool ui_statusbar_get_time(ui_datetime_t * out)
+{
+    RTC_TimeTypeDef t;
+    RTC_DateTypeDef d;
+
+    if (HAL_RTC_GetTime(&hrtc, &t, RTC_FORMAT_BIN) != HAL_OK) return false;
+    /* GetDate muss nach GetTime folgen, sonst bleiben die Shadow-Register gesperrt */
+    if (HAL_RTC_GetDate(&hrtc, &d, RTC_FORMAT_BIN) != HAL_OK) return false;
+    if (d.Year < 24) return false;           /* Uhr nicht gestellt */
+
+    out->year   = (uint16_t)(2000 + d.Year);
+    out->month  = d.Month;
+    out->day    = d.Date;
+    out->hour   = t.Hours;
+    out->minute = t.Minutes;
+    return true;
+}
 
 /* USER CODE END 1 */

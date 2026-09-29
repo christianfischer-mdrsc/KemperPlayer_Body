@@ -14,6 +14,8 @@ Eigenbau-Controller für den **Kemper Profiler Player**: 7"-Touch-Display (River
 
 Beide Bilder sind echte Renderings aus LVGL mit genau dem Code in diesem Repository.
 
+Oben läuft in beiden Ansichten die **Statusleiste** mit: links die USB-Verbindung zum Kemper, rechts Datum und Uhrzeit aus dem RTC des STM32. In den Bildern ist der Kemper als verbunden dargestellt; solange USB-MIDI noch fehlt, zeigt das Display „Kein Kemper“.
+
 **Startbildschirm** mit Fortschritt und gemessener Bootzeit:
 
 ![Startbildschirm beim Laden](docs/images/vorschau_start_laden.png)
@@ -50,6 +52,8 @@ Basis ist der offizielle LVGL-Port für das Riverdi-7"-Display ([lvgl/lv_port_ri
 
 Beim Einschalten erscheint der Startbildschirm und zeigt Fortschritt und Bootzeit (Millisekunden seit Reset). Danach blendet er zur Live-Ansicht über. Über **Bearbeiten** oben rechts wechselst du in die Bearbeiten-Ansicht, über den blauen **Play-Button** zurück. Sonst hat die Oberfläche noch keine Funktion.
 
+**Uhrzeit:** Beim allerersten Start stellt die Firmware den RTC auf den Zeitpunkt des Builds (`__DATE__`/`__TIME__`) und merkt sich das im Backup-Register. Der RTC läuft derzeit mit dem internen LSI-Oszillator, geht also ungenau und behält die Zeit ohne Versorgung nicht. Für eine dauerhaft richtige Uhr braucht es LSE (32,768-kHz-Quarz) und eine Pufferung an VBAT.
+
 ## Aufbau des Repositorys
 
 ```
@@ -57,8 +61,10 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 ├── CM7/UI/                   Kemper-Oberfläche
 │   ├── ui_boot.c / .h        Startbildschirm mit Fortschritt und Bootzeit
 │   ├── ui_live.c / .h        Live- und Bearbeiten-Ansicht in C (ui_start())
+│   ├── ui_statusbar.c / .h   Statusleiste: USB-Status, Datum, Uhrzeit
 │   └── xml/                  Dieselben Ansichten als LVGL-XML (Referenz)
 ├── CM7/Core/Src/main.c       Startbildschirm, Init-Schritte, dann ui_start()
+├── CM7/Core/Src/rtc.c        RTC als Zeitquelle für die Statusleiste
 ├── Middlewares/Third_Party/LVGL/lv_conf.h   Fonts aktiviert, Demos aus
 └── STM32CubeIDE/             Projektdateien (CM7 und CM4)
 prototype/                    Interaktiver HTML-Prototyp

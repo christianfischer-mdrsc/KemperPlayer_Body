@@ -94,6 +94,9 @@ button:focus-visible{outline:2px solid var(--selLine);outline-offset:2px}
 .led{width:10px;height:10px;border-radius:5px;background:#e5483d;animation:blink var(--beat,.5s) steps(1) infinite}
 @keyframes blink{50%{background:#3a2020}}
 @media (prefers-reduced-motion:reduce){.led{animation:none}}
+.sbar{flex:none;height:40px;display:flex;align-items:center;gap:8px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);font-size:16px;color:var(--tx2)}
+.sbar .sep{width:1px;height:20px;background:var(--line);margin:0 6px}
+.sbar .tm{font-size:23px;color:var(--tx);letter-spacing:.03em}
 </style>
 </head>
 <body>
@@ -332,7 +335,6 @@ function renderMain(){
     <button class="row" data-act="tap" style="align-items:center;gap:8px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--tile);font-size:15px;color:var(--tx2)" aria-label="Tap Tempo">
       <span class="led" style="--beat:${(60/S.bpm).toFixed(3)}s"></span><span class="cond" style="font-size:20px;color:var(--tx)">${S.bpm}</span> BPM
     </button>
-    <span class="row" style="align-items:center;gap:6px;font-size:15px;color:var(--tx2)"><span style="width:9px;height:9px;border-radius:5px;background:#46c26b"></span>USB</span>
     ${S.set.lock?'<span class="cond" style="font-size:13px;padding:3px 8px;border-radius:4px;background:#3a2a14;color:#f5b36b">Touch gesperrt</span>':''}
   </div>
   <div style="flex-grow:1"></div>
@@ -630,11 +632,20 @@ function encRot(k,d){
   if(e.rot(d)!=='nr')render();
 }
 function encPush(k){const e=encDefs()[k];if(!e||!e.push)return;if(e.push()!=='nr')render();}
+const WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+function clockTxt(){const d=new Date(),z=n=>String(n).padStart(2,'0');return{t:z(d.getHours())+':'+z(d.getMinutes()),d:`${WD[d.getDay()]}, ${z(d.getDate())}.${z(d.getMonth()+1)}.${d.getFullYear()}`};}
+function usbIcon(c){return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v17"/><path d="M9.5 5 12 2l2.5 3"/><path d="M12 15l-5-3V9"/><path d="M12 12.5l5-2.5V7"/><circle cx="7" cy="8" r="1.4" fill="${c}"/><rect x="15.6" y="5.6" width="2.8" height="2.8" fill="${c}"/><circle cx="12" cy="20" r="2" fill="${c}"/></svg>`;}
+function statusBar(){
+  const c=clockTxt(),on=S.usb!==false,col=on?'#3ddc84':'var(--tx3)';
+  return `<div class="sbar">${usbIcon(on?'#3ddc84':'#6a6e74')}<span style="color:${on?'var(--tx)':'var(--tx3)'}">${on?'Kemper verbunden':'Kein Kemper'}</span>
+    <div style="flex-grow:1"></div><span id="sb-date">${c.d}</span><span class="sep"></span><span id="sb-time" class="cond tm">${c.t}</span></div>`;
+}
+setInterval(()=>{const c=clockTxt(),t=document.getElementById('sb-time'),d=document.getElementById('sb-date');if(t&&t.textContent!==c.t)t.textContent=c.t;if(d&&d.textContent!==c.d)d.textContent=c.d;},1000);
 function render(){
   const f={main:renderMain,detail:renderDetail,browser:renderBrowser,tuner:renderTuner,grid:renderGrid,section:renderSection,settings:renderSettings,assign:renderAssign}[S.screen];
   $screen.classList.toggle('day',S.set.theme==='day');
   const body=f();
-  $screen.innerHTML=`<div class="col" style="height:600px">${body}</div><div class="toast" id="toast"></div><div class="dimmer" id="dimmer"></div>`;
+  $screen.innerHTML=`<div class="col" style="height:600px">${statusBar()}<div class="col" id="body" style="flex:1 1 0;min-height:0;overflow:hidden">${body}</div></div><div class="toast" id="toast"></div><div class="dimmer" id="dimmer"></div>`;
   applyDim();
   if(S.screen==='tuner')tunerTick();
   if(S.screen==='browser'){const b=document.getElementById('blist'),e=document.getElementById('bsel');if(b&&e){b.scrollTop=S._bscroll||0;const top=e.offsetTop-b.offsetTop;if(top<b.scrollTop)b.scrollTop=top;else if(top+e.offsetHeight>b.scrollTop+b.clientHeight)b.scrollTop=top+e.offsetHeight-b.clientHeight;b.addEventListener('scroll',()=>{S._bscroll=b.scrollTop;});}}
