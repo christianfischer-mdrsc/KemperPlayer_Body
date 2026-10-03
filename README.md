@@ -24,7 +24,7 @@ Oben läuft in beiden Ansichten die **Statusleiste** mit: links die USB-Verbindu
 
 ## Interaktiver HTML-Prototyp
 
-Im Ordner [`prototype/`](prototype/) liegt die komplette Bedienoberfläche als HTML zum Ausprobieren, inklusive Performance-Browser, Bank-Übersicht, Effekt-Details, Tuner, Einstellungen, Stomp-Belegung und Morph:
+Im Ordner [`prototype/`](prototype/) liegt die komplette Bedienoberfläche als HTML zum Ausprobieren, inklusive Startseite, Performance-Browser, Bank-Übersicht, Effekt-Details, Tuner, Einstellungen, Stomp-Belegung, Morph, Setlist-Ansicht, Setlist Manager und Song-Editor (Teile wie Intro, Verse, Solo mit eigenem Slot, Bildschirmtastatur):
 
 | Datei | Inhalt |
 |---|---|
