@@ -73,9 +73,11 @@
 
 /* USER CODE BEGIN PV */
 /* Zusatzspeicher fuer LVGL im DTCM-RAM (siehe lv_mem_add_pool in main()).
+ * 112 kB; die restlichen 16 kB des DTCM sind der Stack des LVGL-Tasks
+ * (freertos.c).
  * Nur die CPU (CM7) greift darauf zu, DMA2D liest weiterhin aus den
  * Zeichenpuffern im AXI-SRAM. */
-static uint8_t lv_mem_dtcm[128 * 1024] __attribute__((section(".dtcm_bss"), aligned(8)));
+static uint8_t lv_mem_dtcm[112 * 1024] __attribute__((section(".dtcm_bss"), aligned(8)));
 
 /* USER CODE END PV */
 
@@ -198,11 +200,11 @@ Error_Handler();
   lv_init();
   lv_tick_set_cb(HAL_GetTick);
 
-  /* Zweiter Speicherpool fuer LVGL im DTCM (128 kB, sonst ungenutzt).
+  /* Zweiter Speicherpool fuer LVGL im DTCM (112 kB).
    * Die 128 kB aus LV_MEM_SIZE reichen fuer Startbildschirm + Live- +
    * Bearbeiten-Ansicht nicht: beim ersten Neuzeichnen nach ui_start()
    * wartet LVGL dann endlos auf Speicher und das Bild bleibt beim
-   * Startbildschirm stehen. Mit dem Zusatzpool stehen 256 kB bereit. */
+   * Startbildschirm stehen. Mit dem Zusatzpool stehen 240 kB bereit. */
   lv_mem_add_pool(lv_mem_dtcm, sizeof(lv_mem_dtcm));
 
   /* Display starten und sofort den Startbildschirm zeigen.
