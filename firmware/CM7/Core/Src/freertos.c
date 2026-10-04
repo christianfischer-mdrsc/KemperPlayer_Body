@@ -45,7 +45,15 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+/* Stack des LVGL-Tasks: 16 kB im DTCM-RAM (schnell, nicht gecacht).
+ * Vorher 4 kB (1024 Worte) dynamisch - zu wenig: lv_obj_redraw() arbeitet
+ * rekursiv durch die verschachtelten Objekte, die Ueberblendung zeichnet
+ * zusaetzlich ueber einen Layer. Der Stack lief ueber, der Task blieb
+ * nach dem ersten Bild (100 %) stehen. */
+#define LVGL_TASK_STACK_WORDS  4096U          /* 4096 x 4 Byte = 16 kB */
+static uint32_t lvgl_task_stack[LVGL_TASK_STACK_WORDS]
+        __attribute__((section(".dtcm_bss"), aligned(8)));
+static osStaticThreadDef_t lvgl_task_tcb;
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 
@@ -82,11 +90,14 @@ __weak void vApplicationIdleHook( void )
 /* USER CODE END 2 */
 
 /* USER CODE BEGIN 4 */
-__weak void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 {
-   /* Run time stack overflow checking is performed if
-   configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
-   called if a stack overflow is detected. */
+   /* Stackueberlauf erkannt: hier anhalten statt mit kaputtem Speicher
+    * weiterzulaufen. Im Debugger zeigt pcTaskName den betroffenen Task. */
+   (void)xTask;
+   (void)pcTaskName;
+   __disable_irq();
+   while (1) { }
 }
 /* USER CODE END 4 */
 
@@ -136,7 +147,8 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  osThreadDef(lvgl_timer, LVGLTimer, osPriorityNormal, 0, 1024);
+  osThreadStaticDef(lvgl_timer, LVGLTimer, osPriorityNormal, 0,
+                    LVGL_TASK_STACK_WORDS, lvgl_task_stack, &lvgl_task_tcb);
   lvgl_timerHandle = osThreadCreate(osThread(lvgl_timer), NULL);
   /* USER CODE END RTOS_THREADS */
 
