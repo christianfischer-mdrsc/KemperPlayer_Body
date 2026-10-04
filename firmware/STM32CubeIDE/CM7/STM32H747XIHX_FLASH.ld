@@ -176,6 +176,16 @@ SECTIONS
     . = ALIGN(8);
   } >RAM_D1
 
+  /* Nicht initialisierter Speicher im DTCM-RAM (128 kB), z. B. zusaetzlicher
+   * LVGL-Speicherpool. NOLOAD: wird beim Start weder kopiert noch genullt. */
+  .dtcm_bss (NOLOAD) :
+  {
+    . = ALIGN(8);
+    *(.dtcm_bss)
+    *(.dtcm_bss*)
+    . = ALIGN(8);
+  } >DTCMRAM
+
   /* Remove information from the compiler libraries */
   /DISCARD/ :
   {

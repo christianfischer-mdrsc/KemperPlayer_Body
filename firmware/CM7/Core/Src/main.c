@@ -72,6 +72,10 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+/* Zusatzspeicher fuer LVGL im DTCM-RAM (siehe lv_mem_add_pool in main()).
+ * Nur die CPU (CM7) greift darauf zu, DMA2D liest weiterhin aus den
+ * Zeichenpuffern im AXI-SRAM. */
+static uint8_t lv_mem_dtcm[128 * 1024] __attribute__((section(".dtcm_bss"), aligned(8)));
 
 /* USER CODE END PV */
 
@@ -194,6 +198,13 @@ Error_Handler();
   lv_init();
   lv_tick_set_cb(HAL_GetTick);
 
+  /* Zweiter Speicherpool fuer LVGL im DTCM (128 kB, sonst ungenutzt).
+   * Die 128 kB aus LV_MEM_SIZE reichen fuer Startbildschirm + Live- +
+   * Bearbeiten-Ansicht nicht: beim ersten Neuzeichnen nach ui_start()
+   * wartet LVGL dann endlos auf Speicher und das Bild bleibt beim
+   * Startbildschirm stehen. Mit dem Zusatzpool stehen 256 kB bereit. */
+  lv_mem_add_pool(lv_mem_dtcm, sizeof(lv_mem_dtcm));
+
   /* Display starten und sofort den Startbildschirm zeigen.
    * Die LVGL-Schleife laeuft erst spaeter im FreeRTOS-Task, deshalb nach
    * jedem Schritt lv_refr_now(), damit der Fortschritt sichtbar wird. */
@@ -211,10 +222,12 @@ Error_Handler();
   lv_refr_now(NULL);
 
   /* TODO: USB-MIDI starten (Schritt 3) und Kemper verbinden (Schritt 4).
-   * Bis das implementiert ist, werden die Schritte nur kurz angezeigt. */
-  ui_boot_step(3, "USB-MIDI folgt");
+   * Bis das implementiert ist, werden die Schritte nur kurz angezeigt.
+   * Auch spaeter gilt: Ohne Kemper wird NICHT gewartet - das Display startet
+   * immer, die Statusleiste zeigt dann "Kein Kemper". */
+  ui_boot_step(3, "USB-MIDI noch nicht aktiv");
   lv_refr_now(NULL);
-  ui_boot_step(4, "Kemper-Verbindung folgt");
+  ui_boot_step(4, "Ohne Kemper starten");
   lv_refr_now(NULL);
 
   /* Oberflaeche aufbauen; schliesst den Startbildschirm ab und blendet
