@@ -165,4 +165,25 @@ bool ui_statusbar_get_time(ui_datetime_t * out)
     return true;
 }
 
+/* Uhr stellen (aus der System-Ansicht, ueberschreibt die schwache Funktion) */
+bool ui_statusbar_set_time(const ui_datetime_t * in)
+{
+    RTC_TimeTypeDef t = {0};
+    RTC_DateTypeDef d = {0};
+
+    if (!in || in->year < 2000 || in->year > 2099) return false;
+    t.Hours   = in->hour;
+    t.Minutes = in->minute;
+    t.Seconds = 0;
+    d.Year    = (uint8_t)(in->year - 2000);
+    d.Month   = in->month;
+    d.Date    = in->day;
+    d.WeekDay = RTC_WEEKDAY_MONDAY;          /* wird von der Anzeige selbst berechnet */
+
+    if (HAL_RTC_SetTime(&hrtc, &t, RTC_FORMAT_BIN) != HAL_OK) return false;
+    if (HAL_RTC_SetDate(&hrtc, &d, RTC_FORMAT_BIN) != HAL_OK) return false;
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, RTC_SET_MAGIC);
+    return true;
+}
+
 /* USER CODE END 1 */

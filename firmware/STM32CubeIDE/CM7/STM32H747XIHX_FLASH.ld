@@ -186,6 +186,16 @@ SECTIONS
     . = ALIGN(8);
   } >DTCMRAM
 
+  /* Nicht initialisierter Speicher im SRAM4 (D3, 64 kB), z. B. die Rig-Namen
+   * aller Banks. NOLOAD: wird beim Start weder kopiert noch genullt. */
+  .d3_bss (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.d3_bss)
+    *(.d3_bss*)
+    . = ALIGN(4);
+  } >RAM_D3
+
   /* Remove information from the compiler libraries */
   /DISCARD/ :
   {
