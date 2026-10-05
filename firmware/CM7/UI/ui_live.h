@@ -1,7 +1,8 @@
 /**
  * @file ui_live.h
- * Live-Ansicht des Kemper-Displays (1024 x 600), nur Darstellung.
- * Entspricht live_screen.xml, aber als reiner C-Code fuer LVGL v9.
+ * Oberflaeche des Kemper-Player-Displays (1024 x 600): Farben und Einstieg.
+ * Aufbau: kemper_player.c (Daten) + ui_common.c (Bausteine, Navigation)
+ * + je Ansicht eine Datei (ui_live, ui_edit, ui_banks, ui_tuner, ui_settings).
  */
 #ifndef UI_LIVE_H
 #define UI_LIVE_H
@@ -43,41 +44,17 @@ extern "C" {
 #define UI_COL_REV       0x2fb3a0
 
 /**
- * Erzeugt die Live-Ansicht als eigenen Screen.
- * @return Zeiger auf den Screen, laden mit lv_screen_load().
- */
-lv_obj_t * ui_live_create(void);
-
-/**
- * Erzeugt die Bearbeiten-Ansicht als eigenen Screen.
- * @return Zeiger auf den Screen, laden mit lv_screen_load().
- */
-lv_obj_t * ui_edit_create(void);
-
-/**
- * Erzeugt Live- und Bearbeiten-Ansicht, verbindet die Buttons
- * "Bearbeiten" und "Play" zum Umschalten und zeigt die Live-Ansicht.
- * Laeuft gerade der Startbildschirm (ui_boot_create()), wird dieser
- * abgeschlossen und danach zur Live-Ansicht uebergeblendet.
+ * Startet die Oberflaeche: Datenmodell anlegen, Live-Ansicht erzeugen und
+ * anzeigen. Laeuft gerade der Startbildschirm (ui_boot_create()), wird
+ * dieser abgeschlossen und danach zur Live-Ansicht uebergeblendet.
  */
 void ui_start(void);
 
-#if LV_USE_XML
 /**
- * Nur fuer die XML-Variante: meldet die Montserrat-Fonts beim
- * XML-Parser an, damit style_text_font="lv_font_montserrat_20" usw.
- * in den .xml-Dateien gefunden wird. Vor dem Laden der XML aufrufen.
+ * Fuer die echten Footswitches: wirkt wie ein Tipp auf das Feld FS1..FS6
+ * (idx 0..5). Nur aus dem LVGL-Task bzw. mit dessen Sperre aufrufen.
  */
-void ui_xml_register_fonts(void);
-
-/**
- * Nur fuer die XML-Variante: laedt globals.xml, die Komponenten und
- * die Screens aus dem Ordner 'path' (z. B. "A:ui/") und erzeugt den
- * gewuenschten Screen. Die Dateien werden nur beim ersten Aufruf geladen.
- */
-lv_obj_t * ui_live_create_from_xml(const char * path);
-lv_obj_t * ui_edit_create_from_xml(const char * path);
-#endif
+void ui_footswitch(uint8_t idx);
 
 #ifdef __cplusplus
 }

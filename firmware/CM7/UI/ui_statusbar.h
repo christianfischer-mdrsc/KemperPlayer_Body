@@ -26,7 +26,7 @@ typedef struct {
 
 /**
  * Erzeugt eine Statusleiste als erstes Kind von 'parent'
- * (volle Breite, UI_STATUSBAR_HEIGHT hoch). Bis zu 4 Leisten.
+ * (volle Breite, UI_STATUSBAR_HEIGHT hoch). Bis zu 4 Leisten gleichzeitig.
  */
 lv_obj_t * ui_statusbar_create(lv_obj_t * parent);
 
@@ -42,6 +42,13 @@ void ui_statusbar_refresh(void);
  * @return false, wenn keine gueltige Zeit vorliegt
  */
 bool ui_statusbar_get_time(ui_datetime_t * out);
+
+/**
+ * Uhr stellen. Schwache Standard-Implementierung liefert false;
+ * auf dem Board ueberschreibt rtc.c sie.
+ * @return true, wenn die Zeit gesetzt wurde
+ */
+bool ui_statusbar_set_time(const ui_datetime_t * in);
 
 #ifdef __cplusplus
 }

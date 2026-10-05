@@ -1,6 +1,7 @@
 /**
  * @file ui_statusbar.c
  * Statusleiste oben: USB-Verbindung links, Datum und Uhrzeit rechts.
+ * Jeder Screen hat seine eigene Leiste; sie meldet sich beim Loeschen ab.
  *
  * Benoetigte Fonts in lv_conf.h: LV_FONT_MONTSERRAT_16, _22
  */
@@ -12,6 +13,7 @@
 #define SB_COL_USB_OFF 0x6a6e74
 
 typedef struct {
+    lv_obj_t * bar;
     lv_obj_t * usb_icon;
     lv_obj_t * usb_text;
     lv_obj_t * date;
@@ -38,6 +40,25 @@ __attribute__((weak)) bool ui_statusbar_get_time(ui_datetime_t * out)
 {
     (void)out;
     return false;
+}
+
+__attribute__((weak)) bool ui_statusbar_set_time(const ui_datetime_t * in)
+{
+    (void)in;
+    return false;
+}
+
+/* Leiste wird mit ihrem Screen geloescht: aus der Liste nehmen */
+static void bar_delete_cb(lv_event_t * e)
+{
+    lv_obj_t * bar = lv_event_get_target(e);
+    for (uint8_t i = 0; i < s_count; i++) {
+        if (s_bars[i].bar == bar) {
+            for (uint8_t k = i; k + 1 < s_count; k++) s_bars[k] = s_bars[k + 1];
+            s_count--;
+            break;
+        }
+    }
 }
 
 static void update_clock(bool force)
@@ -94,6 +115,8 @@ lv_obj_t * ui_statusbar_create(lv_obj_t * parent)
     statusbar_t * b = &s_bars[s_count++];
 
     lv_obj_t * bar = lv_obj_create(parent);
+    b->bar = bar;
+    lv_obj_add_event_cb(bar, bar_delete_cb, LV_EVENT_DELETE, NULL);
     lv_obj_set_size(bar, LV_PCT(100), UI_STATUSBAR_HEIGHT);
     lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,

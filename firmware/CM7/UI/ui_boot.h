@@ -8,8 +8,8 @@
  *   ... Initialisierung ...
  *   ui_boot_step(1, NULL);             // "Touch"
  *   ...
- *   ui_boot_finish(ui_live_create());  // zeigt 100 %, friert die Zeit ein,
- *                                      // blendet danach zur Live-Ansicht ueber
+ *   ui_start();                        // ruft ui_boot_finish() auf: zeigt 100 %,
+ *                                      // friert die Zeit ein, blendet zur Live-Ansicht ueber
  *
  * Die angezeigte Zeit ist lv_tick_get(), also die Millisekunden seit Reset
  * (im Riverdi-Projekt ist lv_tick an HAL_GetTick() gekoppelt).

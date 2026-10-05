@@ -45,6 +45,7 @@
 #include "lvgl/lvgl.h"
 #include "ui_live.h"
 #include "ui_boot.h"
+#include "kemper_player.h"
 #include "lvgl_port_touch.h"
 #include "lvgl_port_display.h"
 
@@ -364,6 +365,24 @@ void PeriphCommonClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/* Display-Helligkeit: Hintergrundbeleuchtung per PWM (TIM15 CH1, Periode 999).
+ * Ueberschreibt die schwachen Funktionen aus kemper_player.c. */
+static uint8_t s_brightness = 100;
+
+void kp_hw_set_brightness(uint8_t pct)
+{
+  if (pct < 5) pct = 5;
+  if (pct > 100) pct = 100;
+  s_brightness = pct;
+  uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim15);
+  __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, (period * pct) / 100u);
+}
+
+uint8_t kp_hw_brightness(void)
+{
+  return s_brightness;
+}
 
 /* USER CODE END 4 */
 
