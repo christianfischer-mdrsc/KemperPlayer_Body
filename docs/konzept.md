@@ -17,8 +17,10 @@ Das Riverdi-Modul braucht 6–48 V. Das 9-V-Netzteil ist deshalb Pflicht, USB di
 
 ## Aufgabenverteilung im STM32H757
 
-- **M7-Kern:** Oberfläche mit LVGL
-- **M4-Kern:** USB-MIDI, Kemper-SysEx-Protokoll, Footswitches, Drehgeber, LEDs, Expression-Pedal
+- **M7-Kern:** Oberfläche mit LVGL, USB-MIDI und Kemper-SysEx-Protokoll (eigener FreeRTOS-Task, siehe `firmware/CM7/USB/`), Footswitches
+- **M4-Kern:** derzeit ungenutzt; vorgesehen für LEDs und Expression-Pedal
+
+USB läuft vorerst auf dem M7: Die Daten landen dort direkt im Modell der Oberfläche, ohne Umweg über gemeinsamen Speicher zwischen den Kernen. Falls die Last später zu hoch wird, lässt sich `kemper_link` auf den M4 verschieben.
 
 ## Einkaufsliste (Prototyp, Richtwerte)
 

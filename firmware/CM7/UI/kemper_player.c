@@ -679,3 +679,8 @@ void kp_rx_tuner(bool signal, const char * note, int8_t cents)
     s.tuner_cents = cents;
     notify(KP_CHG_TUNER);
 }
+
+void kp_rx_link_info(void)
+{
+    notify(KP_CHG_SYSTEM);
+}

@@ -99,6 +99,33 @@ Ohne Verdrahtung testen: Der Taster **BTN1** auf dem Board (PC6) wirkt wie FS1. 
 
 **Uhrzeit:** Beim allerersten Start stellt die Firmware den RTC auf den Zeitpunkt des Builds (`__DATE__`/`__TIME__`) und merkt sich das im Backup-Register. Der RTC läuft derzeit mit dem internen LSI-Oszillator, geht also ungenau und behält die Zeit ohne Versorgung nicht. Für eine dauerhaft richtige Uhr braucht es LSE (32,768-kHz-Quarz) und eine Pufferung an VBAT.
 
+## Kemper-Verbindung (USB)
+
+Das Display ist ein **USB-MIDI-Gerät** (class compliant, wie MIDI Captain & Co.) und hängt an der **USB-A-Buchse des Players**. Der Player ist USB-Host. Die USB-B-Buchse des Players bleibt frei für Rig Manager und USB-Audio am Rechner.
+
+**Anschluss:** Die USB-Schnittstelle des Riverdi-Boards ist der 5-polige Molex-Stecker **P10 „USB“** (1,25 mm): 1 = VCC_USB, 2 = D−, 3 = D+, 4 = ID, 5 = GND. **Pin 4 (ID) bleibt offen** (= Device-Modus laut Riverdi-Datenblatt). D−, D+ und GND auf einen USB-A-Stecker zum Player. VCC_USB (Pin 1) kann ebenfalls angeschlossen werden, die Firmware nutzt die 5 V des Players aber nicht; das Display läuft über sein eigenes Netzteil.
+
+> **Vor dem ersten Anstecken:** Mit eingeschaltetem Display und *ohne* Kabel an P10 Pin 1 gegen GND messen. Dort sollten **0 V** anliegen (der VBUS-Schalter USB1_EN/PF10 für den Host-Modus bleibt aus). Liegen 5 V an, VCC_USB nicht mit dem Player verbinden und Bescheid geben.
+
+**Was die Firmware macht** (`firmware/CM7/USB/`):
+
+1. Das Display meldet sich am Player als MIDI-Gerät „Kemper Player Display“ an.
+2. Es schaltet den Player mit dem Kemper-„Beacon“ in den bidirektionalen SysEx-Modus. Der Player schickt dann etwa alle 500 ms ein Lebenszeichen und meldet Änderungen (z. B. Rig-Name) von selbst.
+3. Als Test der Übertragung werden abgefragt (alle 3 s neu): **Name von Rig 1 in Bank 1**, Name des aktuellen Rigs, Amp, Cab und Rig-Tempo. Der Name von Rig 1 landet auch in der Bank-Übersicht und auf FS1; Amp, Cab und Tempo in der Live-Ansicht.
+4. Zusätzlich fragt das Display per MIDI-Identity-Request nach einer Firmware-Kennung. Kemper dokumentiert diese Antwort nicht; kommt keine, steht dort „vom Kemper nicht gemeldet“.
+
+Die Abfrage für Rig 1 nutzt die erweiterte String-Adresse `00 00 01 00 01` (Funktion 0x47). Sie ist nicht offiziell dokumentiert, laut Kemper-Forum liefert der Player damit aber den Namen von Bank 1 / Rig 1. Kommt keine Antwort, zeigt die Zeile „keine Antwort“ – der aktuelle Rig-Name (offiziell dokumentiert) bestätigt die Übertragung dann trotzdem.
+
+**Überwachung:** Kabel ab oder Player aus wird über den USB-Zustand erkannt. Bleiben die Lebenszeichen 1,5 s aus, gilt die Verbindung als unterbrochen; das Display versucht dann alle 2 s neu zu verbinden. Die Statusleiste zeigt „Kemper verbunden“ nur, solange Lebenszeichen kommen.
+
+**Anzeige:** *System* (Zahnrad) → Abschnitt **Kemper-Verbindung**: Status mit Verbindungsdauer, USB-Zustand, Rig 1 (Bank 1), aktuelles Rig, Amp/Cab, Tempo, Firmware, Alter des letzten Lebenszeichens und Zähler für Nachrichten und Unterbrechungen.
+
+**Senden von Aktionen** (nächster Schritt): Rig laden per Program Change, Effekte per CC 17–29, Tap per CC 30, Tuner per CC 31, Parameter per SysEx. Dafür werden die vorbereiteten `kp_link_*`-Funktionen in `kemper_link.c` gefüllt.
+
+**USB-Kennung:** VID/PID 0x1209/0x0001 (von pid.codes für private Tests freigegeben). Für eine Weitergabe des Geräts bräuchte es eine eigene PID.
+
+**CubeMX:** Die USB-Teile sind von Hand eingebunden. Wer das Projekt mit CubeMX neu erzeugt, muss in `CM7/Core/Inc/stm32h7xx_hal_conf.h` wieder `HAL_PCD_MODULE_ENABLED` setzen (oder in CubeMX USB_OTG_HS auf *Device_Only* stellen, ohne die ST-Middleware „USB_DEVICE“ zu aktivieren).
+
 ## Aufbau des Repositorys
 
 ```
@@ -113,9 +140,16 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── ui_edit.c             Bearbeiten-Ansicht, Modul-Dialog, Umbenennen
 │   ├── ui_banks.c            Bank-Übersicht
 │   ├── ui_tuner.c            Tuner
-│   ├── ui_settings.c         System (Level, Footswitch-Modus, Helligkeit, Uhr, Info)
+│   ├── ui_settings.c         System (Level, Footswitch-Modus, Helligkeit, Kemper-Verbindung, Uhr, Info)
 │   ├── ui_statusbar.c / .h   Statusleiste: USB-Status, Datum, Uhrzeit
 │   └── xml/                  Frühere Ansichten als LVGL-XML (veraltet, nur Referenz)
+├── CM7/USB/                  Verbindung zum Kemper
+│   ├── usbd_conf.c / .h      USB-Gerät auf USB_OTG_HS (internes FS-PHY), FIFOs
+│   ├── usbd_desc.c / .h      Geräte- und String-Deskriptoren
+│   ├── usbd_midi.c / .h      USB-MIDI-Klasse (MIDI 1.0), Empfangspuffer, Senden
+│   └── kemper_link.c / .h    Eigener Task: SysEx-Protokoll, Beacon, Verbindungsüberwachung,
+│                             Testdaten; Übergabe an das Modell im LVGL-Task
+├── Middlewares/ST/STM32_USB_Device_Library/   ST USB Device Library v2.11.3 (Core)
 ├── CM7/Core/Src/main.c       Startbildschirm, Init-Schritte, dann ui_start()
 ├── CM7/Core/Src/footswitch.c Footswitches am Expansion-Header (Entprellen, langer Druck)
 ├── CM7/Core/Src/rtc.c        RTC als Zeitquelle für die Statusleiste, Uhr stellen
@@ -127,10 +161,10 @@ docs/                         Konzept, Einkaufsliste, Kemper-Protokoll, Bilder
 
 ## Nächste Schritte
 
-- [ ] USB-MIDI-Device auf dem M4-Kern (TinyUSB), erste Kemper-Befehle
+- [x] USB-MIDI-Gerät (M7) am USB-A des Players, Verbindungsüberwachung, erste Daten vom Kemper
 - [x] Datenmodell des Players (Banks, Rigs, Module, Effect Buttons) und Anbindung an die Oberfläche
 - [x] Screens: Bank-Übersicht, Tuner, System, Modul- und Parameter-Dialoge
-- [ ] kp_link_* / kp_rx_* mit USB-MIDI füllen (Rig laden, Effekte, Tempo, Tuner, Namen)
+- [ ] kp_link_* / kp_rx_* vollständig mit USB-MIDI füllen (Rig laden, Effekte, Tuner, Bank/Slot) – bisher: Verbindung, Rig 1, Amp/Cab, Tempo
 - [x] Footswitches über den 40-Pin-Header
 - [ ] LED-Ringe (SK6812) an den Footswitches
 - [ ] Fonts mit Umlauten, Einstellungen dauerhaft speichern

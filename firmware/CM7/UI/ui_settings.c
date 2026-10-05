@@ -1,11 +1,27 @@
 /**
  * @file ui_settings.c
  * System: Ausbaustufe des Players, Footswitch-Modus, Display-Helligkeit,
- * Datum/Uhrzeit und Info.
+ * Kemper-Verbindung, Datum/Uhrzeit und Info.
  */
+#include <stdio.h>
 #include "ui_common.h"
 #include "ui_screens.h"
 #include "ui_statusbar.h"
+#include "kemper_link.h"
+
+/* Zeilen im Abschnitt "Kemper-Verbindung" */
+enum {
+    KR_USB = 0, KR_RIG1, KR_RIG, KR_STACK, KR_TEMPO, KR_FIRMWARE,
+    KR_SENSE, KR_STATS, KR_COUNT
+};
+static const char * const KR_NAME[KR_COUNT] = {
+    "USB", "Rig 1 (Bank 1)", "Aktuelles Rig", "Amp / Cab", "Rig-Tempo", "Firmware",
+    "Lebenszeichen", "Nachrichten"
+};
+
+#define COL_OK    0x3ddc84
+#define COL_WAIT  0xf0b429
+#define COL_ERR   0xe5483d
 
 static struct {
     lv_obj_t * level[3];
@@ -15,11 +31,103 @@ static struct {
     lv_obj_t * bright_val;
     lv_obj_t * roller[5];          /* Tag, Monat, Jahr, Stunde, Minute */
     lv_obj_t * time_msg;
-    lv_obj_t * conn;
+    lv_obj_t * k_dot;              /* Kemper-Verbindung */
+    lv_obj_t * k_state;
+    lv_obj_t * k_val[KR_COUNT];
+    lv_timer_t * k_timer;
 } w;
 
 #define YEAR_FIRST 2024
 #define YEAR_COUNT 27
+
+/* Abschnitt "Kemper-Verbindung" aus dem Zustand des USB-Tasks fuellen */
+static void update_link(void)
+{
+    static kl_info_t i;
+    char buf[96];
+    kemper_link_get_info(&i);
+
+    const bool ok = i.kemper == KL_KEMPER_OK;
+    uint32_t col = COL_ERR;
+    if (ok) col = COL_OK;
+    else if (i.usb == KL_USB_ENUM || (i.usb == KL_USB_READY && i.kemper != KL_KEMPER_LOST)) col = COL_WAIT;
+    lv_obj_set_style_bg_color(w.k_dot, lv_color_hex(col), 0);
+
+    if (ok) {
+        uint32_t s = (i.now_ms - i.connected_since_ms) / 1000U;
+        lv_snprintf(buf, sizeof(buf), "Verbunden seit %02lu:%02lu:%02lu",
+                    (unsigned long)(s / 3600U), (unsigned long)(s / 60U % 60U),
+                    (unsigned long)(s % 60U));
+        lv_label_set_text(w.k_state, buf);
+    } else {
+        lv_label_set_text(w.k_state, kemper_link_state_text(&i));
+    }
+
+    /* USB-Seite */
+    static const char * const USB_TXT[] = {
+        "nicht verbunden", "wird vom Kemper eingerichtet", "vom Kemper eingerichtet (MIDI bereit)"
+    };
+    lv_label_set_text(w.k_val[KR_USB], USB_TXT[i.usb <= KL_USB_READY ? i.usb : 0]);
+
+    /* Daten vom Kemper (SysEx) */
+    if (i.identity_valid) {
+        lv_snprintf(buf, sizeof(buf), "%u.%u.%u.%u", i.id_version[0], i.id_version[1],
+                    i.id_version[2], i.id_version[3]);
+        lv_label_set_text(w.k_val[KR_FIRMWARE], buf);
+    } else {
+        lv_label_set_text(w.k_val[KR_FIRMWARE], ok ? "vom Kemper nicht gemeldet" : "-");
+    }
+    lv_label_set_text(w.k_val[KR_RIG1], i.rig1_name[0] ? i.rig1_name : (ok ? "keine Antwort" : "-"));
+    lv_label_set_text(w.k_val[KR_RIG], i.rig_name[0] ? i.rig_name : "-");
+    if (i.amp_name[0] || i.cab_name[0]) {
+        lv_snprintf(buf, sizeof(buf), "%s / %s", i.amp_name[0] ? i.amp_name : "-",
+                    i.cab_name[0] ? i.cab_name : "-");
+        lv_label_set_text(w.k_val[KR_STACK], buf);
+    } else {
+        lv_label_set_text(w.k_val[KR_STACK], "-");
+    }
+    if (i.tempo_valid) {
+        lv_snprintf(buf, sizeof(buf), "%u BPM%s", i.tempo_bpm, i.tempo_on ? "" : " (Tempo aus)");
+        lv_label_set_text(w.k_val[KR_TEMPO], buf);
+    } else {
+        lv_label_set_text(w.k_val[KR_TEMPO], "-");
+    }
+
+    /* Ueberwachung */
+    if (ok) {
+        uint32_t age = i.now_ms - i.last_sense_ms;
+        lv_snprintf(buf, sizeof(buf), "vor %lu,%lu s", (unsigned long)(age / 1000U),
+                    (unsigned long)(age % 1000U / 100U));
+    } else if (i.kemper == KL_KEMPER_LOST) {
+        lv_snprintf(buf, sizeof(buf), "seit %lu s keine Antwort",
+                    (unsigned long)((i.now_ms - i.last_sense_ms) / 1000U));
+    } else {
+        lv_snprintf(buf, sizeof(buf), "-");
+    }
+    lv_label_set_text(w.k_val[KR_SENSE], buf);
+
+    int n = lv_snprintf(buf, sizeof(buf), "%lu empfangen, %lu gesendet, %lu Unterbrechungen",
+                        (unsigned long)i.rx_messages, (unsigned long)i.tx_messages,
+                        (unsigned long)i.lost_count);
+    if (i.usb_errors && n > 0 && (uint32_t)n < sizeof(buf))
+        lv_snprintf(buf + n, sizeof(buf) - (uint32_t)n, ", %lu USB-Fehler", (unsigned long)i.usb_errors);
+    lv_label_set_text(w.k_val[KR_STATS], buf);
+}
+
+static void link_timer_cb(lv_timer_t * t)
+{
+    (void)t;
+    update_link();
+}
+
+static void scr_delete_cb(lv_event_t * e)
+{
+    /* Timer genau dieses Screens loeschen (beim Ueberblenden kann schon
+     * ein neuer Screen samt Timer existieren) */
+    lv_timer_t * t = lv_event_get_user_data(e);
+    if (t) lv_timer_delete(t);
+    if (w.k_timer == t) w.k_timer = NULL;
+}
 
 static void update(void)
 {
@@ -30,7 +138,7 @@ static void update(void)
         lv_label_set_text(w.level_info, "4 Effektmodule (A, B, DLY, REV), 10 Banks = 50 Rigs");
     ui_button_set_selected(w.fsm[0], kp_fs_mode() == KP_FS_MODE_RIGS);
     ui_button_set_selected(w.fsm[1], kp_fs_mode() == KP_FS_MODE_FX);
-    lv_label_set_text(w.conn, kp_connected() ? "verbunden" : "nicht verbunden");
+    update_link();
 }
 
 static void refresh(uint32_t chg)
@@ -135,6 +243,11 @@ lv_obj_t * ui_settings_build(void)
     lv_obj_t * right = ui_col(cols, 12);
     lv_obj_set_width(right, 1);
     lv_obj_set_flex_grow(right, 1);
+    /* Rechte Spalte ist hoeher als der Bildschirm: senkrecht scrollen */
+    lv_obj_set_height(right, LV_PCT(100));
+    lv_obj_set_scrollable(right, true);
+    lv_obj_set_scroll_dir(right, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(right, LV_SCROLLBAR_MODE_AUTO);
 
     /* Player-Level */
     lv_obj_t * p = section(left, "Kemper Player");
@@ -174,6 +287,27 @@ lv_obj_t * ui_settings_build(void)
     lv_obj_set_width(w.bright_val, 64);
     lv_label_set_text_fmt(w.bright_val, "%u %%", kp_hw_brightness());
 
+    /* Kemper-Verbindung */
+    p = section(right, "Kemper-Verbindung");
+    r = ui_row(p, 10);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    w.k_dot = lv_obj_create(r);
+    lv_obj_remove_style_all(w.k_dot);
+    lv_obj_set_size(w.k_dot, 14, 14);
+    lv_obj_set_style_radius(w.k_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(w.k_dot, LV_OPA_COVER, 0);
+    w.k_state = ui_label(r, "", UI_COL_TEXT, &lv_font_montserrat_18);
+    for (int k = 0; k < KR_COUNT; k++) {
+        r = ui_row(p, 8);
+        lv_obj_set_width(r, LV_PCT(100));
+        lv_obj_t * key = ui_label(r, KR_NAME[k], UI_COL_TEXT3, &lv_font_montserrat_16);
+        lv_obj_set_width(key, 150);
+        w.k_val[k] = ui_label(r, "-", UI_COL_TEXT, &lv_font_montserrat_16);
+        lv_obj_set_width(w.k_val[k], 1);
+        lv_obj_set_flex_grow(w.k_val[k], 1);
+        lv_label_set_long_mode(w.k_val[k], LV_LABEL_LONG_DOT);
+    }
+
     /* Datum und Uhrzeit */
     p = section(right, "Datum und Uhrzeit");
     ui_datetime_t now = { 2026, 1, 1, 12, 0 };
@@ -203,10 +337,7 @@ lv_obj_t * ui_settings_build(void)
     /* Info */
     p = section(right, "Info");
     r = ui_row(p, 8);
-    ui_label(r, "Kemper:", UI_COL_TEXT3, &lv_font_montserrat_16);
-    w.conn = ui_label(r, "", UI_COL_TEXT, &lv_font_montserrat_16);
-    r = ui_row(p, 8);
-    ui_label(r, "Firmware:", UI_COL_TEXT3, &lv_font_montserrat_16);
+    ui_label(r, "Display-Firmware:", UI_COL_TEXT3, &lv_font_montserrat_16);
     ui_label(r, __DATE__ "  " __TIME__, UI_COL_TEXT, &lv_font_montserrat_16);
     r = ui_row(p, 8);
     ui_label(r, "LVGL:", UI_COL_TEXT3, &lv_font_montserrat_16);
@@ -215,5 +346,8 @@ lv_obj_t * ui_settings_build(void)
 
     update();
     ui_nav_set_refresh(scr, refresh);
+    /* Lebenszeichen und Verbindungsdauer laufend aktualisieren */
+    w.k_timer = lv_timer_create(link_timer_cb, 500, NULL);
+    lv_obj_add_event_cb(scr, scr_delete_cb, LV_EVENT_DELETE, w.k_timer);
     return scr;
 }

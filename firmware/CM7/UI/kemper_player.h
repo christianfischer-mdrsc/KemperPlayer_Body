@@ -282,6 +282,9 @@ void kp_rx_module(kp_mod_t m, uint8_t type, bool on);
 void kp_rx_param(kp_param_t p, int16_t value);
 void kp_rx_tempo(bool on, uint16_t bpm);
 void kp_rx_tuner(bool signal, const char * note, int8_t cents);
+/* Neue Verbindungsdaten (Seriennummer, Status ...) fuer die Anzeige,
+ * abzufragen mit kemper_link_get_info(); meldet KP_CHG_SYSTEM */
+void kp_rx_link_info(void);
 
 /* ---------------------------------------------------------------------
  * Board-Funktionen (schwach definiert, auf dem Board ueberschrieben)
