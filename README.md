@@ -81,6 +81,22 @@ Signalkette je Ausbaustufe: Level I/II `A, B | Stack | DLY, REV` mit 10 Banks; L
 
 **Hinweise:** Die eingebauten LVGL-Fonts enthalten keine Umlaute, deshalb kommen in der Oberfläche keine vor. Die Wertebereiche der Parameter sind vorläufig und werden bei der MIDI-Anbindung an die Kemper-Werte angeglichen. Einstellungen werden noch nicht dauerhaft gespeichert.
 
+## Footswitches anschließen
+
+Taster (Schließer) zwischen Pin und GND am Expansion-Header P8 (1,27 mm). Der interne Pull-up ist an; ein externer Pull-up (4,7 kΩ auf **3,3 V**) darf zusätzlich vorhanden sein. **Nie 5 V an die Pins** (Header-Pins 1 und 3 führen 5 V).
+
+| Footswitch | MCU | Header-Pin |
+|---|---|---|
+| FS1 | PD11 | 10 |
+| FS2 | PB10 | 12 |
+| FS3 | PD12 | 13 |
+| FS4 | PD13 | 15 |
+| FS5 | PB11 | 34 |
+| FS6 | PH4 | 36 |
+| GND | | 6, 7, 17, 18, 28 |
+
+Ohne Verdrahtung testen: Der Taster **BTN1** auf dem Board (PC6) wirkt wie FS1. Treiber: `CM7/Core/Src/footswitch.c` (Abfrage alle 5 ms, Druck wird sofort gemeldet, danach 30 ms Entprellen; lang gedrückt ab 800 ms über `footswitch_long_press()`). Pinbelegung laut Riverdi-Datenblatt Rev. 1.1 – bei neueren Board-Revisionen bitte gegenprüfen.
+
 **Uhrzeit:** Beim allerersten Start stellt die Firmware den RTC auf den Zeitpunkt des Builds (`__DATE__`/`__TIME__`) und merkt sich das im Backup-Register. Der RTC läuft derzeit mit dem internen LSI-Oszillator, geht also ungenau und behält die Zeit ohne Versorgung nicht. Für eine dauerhaft richtige Uhr braucht es LSE (32,768-kHz-Quarz) und eine Pufferung an VBAT.
 
 ## Aufbau des Repositorys
@@ -101,6 +117,7 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── ui_statusbar.c / .h   Statusleiste: USB-Status, Datum, Uhrzeit
 │   └── xml/                  Frühere Ansichten als LVGL-XML (veraltet, nur Referenz)
 ├── CM7/Core/Src/main.c       Startbildschirm, Init-Schritte, dann ui_start()
+├── CM7/Core/Src/footswitch.c Footswitches am Expansion-Header (Entprellen, langer Druck)
 ├── CM7/Core/Src/rtc.c        RTC als Zeitquelle für die Statusleiste, Uhr stellen
 ├── Middlewares/Third_Party/LVGL/lv_conf.h   Fonts aktiviert, Demos aus
 └── STM32CubeIDE/             Projektdateien (CM7 und CM4)
@@ -114,7 +131,8 @@ docs/                         Konzept, Einkaufsliste, Kemper-Protokoll, Bilder
 - [x] Datenmodell des Players (Banks, Rigs, Module, Effect Buttons) und Anbindung an die Oberfläche
 - [x] Screens: Bank-Übersicht, Tuner, System, Modul- und Parameter-Dialoge
 - [ ] kp_link_* / kp_rx_* mit USB-MIDI füllen (Rig laden, Effekte, Tempo, Tuner, Namen)
-- [ ] Footswitches und LEDs über den 40-Pin-Header (Einstieg: `ui_footswitch()`)
+- [x] Footswitches über den 40-Pin-Header
+- [ ] LED-Ringe (SK6812) an den Footswitches
 - [ ] Fonts mit Umlauten, Einstellungen dauerhaft speichern
 - [ ] Startseite, Setlist-Bereich und Setlist Manager
 

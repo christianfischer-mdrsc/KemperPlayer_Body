@@ -446,6 +446,11 @@
 			<locationURI>PARENT-2-PROJECT_LOC/CM7/Core/Src/lvgl_port_display.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/footswitch.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/CM7/Core/Src/footswitch.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/lvgl_port_touch.c</name>
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/CM7/Core/Src/lvgl_port_touch.c</locationURI>
