@@ -52,6 +52,8 @@
 									<listOptionValue builtIn="false" value="../../../Utilities/JPEG"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/LVGL"/>
 									<listOptionValue builtIn="false" value="../../../CM7/UI"/>
+									<listOptionValue builtIn="false" value="../../../CM7/USB"/>
+									<listOptionValue builtIn="false" value="../../../Middlewares/ST/STM32_USB_Host_Library/Core/Inc"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/FatFs/src"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/FreeRTOS/Source/include"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS"/>
@@ -135,6 +137,8 @@
 									<listOptionValue builtIn="false" value="../../../Utilities/JPEG"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/LVGL"/>
 									<listOptionValue builtIn="false" value="../../../CM7/UI"/>
+									<listOptionValue builtIn="false" value="../../../CM7/USB"/>
+									<listOptionValue builtIn="false" value="../../../Middlewares/ST/STM32_USB_Host_Library/Core/Inc"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/FatFs/src"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/FreeRTOS/Source/include"/>
 									<listOptionValue builtIn="false" value="../../../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS"/>

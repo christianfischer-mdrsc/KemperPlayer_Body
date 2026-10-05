@@ -49,6 +49,7 @@
 #include "footswitch.h"
 #include "lvgl_port_touch.h"
 #include "lvgl_port_display.h"
+#include "kemper_link.h"
 
 /* USER CODE END Includes */
 
@@ -93,6 +94,12 @@ void MX_FREERTOS_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* Uebergibt Verbindungsdaten vom USB-Task an das Modell (laeuft im LVGL-Task) */
+static void kemper_poll_cb(lv_timer_t * t)
+{
+  (void)t;
+  kemper_link_ui_poll();
+}
 
 /* USER CODE END 0 */
 
@@ -226,18 +233,21 @@ Error_Handler();
   ui_boot_step(2, NULL);                        /* Speicher */
   lv_refr_now(NULL);
 
-  /* TODO: USB-MIDI starten (Schritt 3) und Kemper verbinden (Schritt 4).
-   * Bis das implementiert ist, werden die Schritte nur kurz angezeigt.
-   * Auch spaeter gilt: Ohne Kemper wird NICHT gewartet - das Display startet
-   * immer, die Statusleiste zeigt dann "Kein Kemper". */
-  ui_boot_step(3, "USB-MIDI noch nicht aktiv");
+  /* USB-Host und Kemper-Verbindung laufen im eigenen Task (kemper_link.c),
+   * der mit dem Scheduler startet. Hier wird NICHT auf den Kemper gewartet:
+   * Das Display startet immer, die Statusleiste zeigt "Kein Kemper", bis
+   * der Player antwortet. */
+  ui_boot_step(3, "USB-Host startet mit dem System");
   lv_refr_now(NULL);
-  ui_boot_step(4, "Ohne Kemper starten");
+  ui_boot_step(4, "Kemper wird im Hintergrund verbunden");
   lv_refr_now(NULL);
 
   /* Oberflaeche aufbauen; schliesst den Startbildschirm ab und blendet
    * nach kurzer Pause zur Live-Ansicht ueber */
   ui_start();
+
+  /* Verbindungsstatus und Kemper-Daten alle 100 ms ins Modell uebernehmen */
+  lv_timer_create(kemper_poll_cb, 100, NULL);
 
   /* pwm */
   if (HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1) != HAL_OK)

@@ -1,7 +1,9 @@
 # Konzept: Kemper Player Display
 
 Eigenbau-Controller mit 7"-Touch-Display und Footswitches für den Kemper Profiler Player.
-Kommunikation über USB-MIDI (der Player ist USB-Host, das Display ein USB-MIDI-Gerät).
+Kommunikation über USB-MIDI: Das Display ist USB-Host, der Player hängt mit seiner USB-B-Buchse daran.
+
+> Geändert gegenüber der ersten Planung (Player als Host, Display als USB-MIDI-Gerät an der USB-A-Buchse des Players): Nur als Host kann das Display die USB-Deskriptoren des Players lesen, also Modell und Seriennummer. Der Rig Manager kann weiter über WLAN verbunden werden. Der Weg über die USB-A-Buchse des Players bleibt als Alternative möglich (Display als MIDI-Gerät, dann ohne Seriennummer).
 
 ## Hardware
 
@@ -10,15 +12,17 @@ Kommunikation über USB-MIDI (der Player ist USB-Host, das Display ein USB-MIDI-
 | Display + MCU | Riverdi RVT70HSSNWC00-B: 7", 1024 × 600, IPS, Optical Bonding, kapazitiver Touch, STM32H757 (M7 + M4), 8 MB SDRAM, 64 MB QSPI |
 | Footswitches | 6 Stück in einer Reihe, 64 mm Abstand, Soft-Touch mit RGB-LED-Ring (SK6812) |
 | Drehgeber | 4 × ALPS EC11E mit Taster, je zwei links und rechts neben dem Display |
-| Anschlüsse | USB-C (verriegelbar) zum Player, 9 V DC (Pedalboard-Standard), optional Expression-Pedal |
+| Anschlüsse | USB zum Player (Display = Host, Kabel zur USB-B-Buchse des Players), 9 V DC (Pedalboard-Standard), optional Expression-Pedal |
 | Gehäuse | ca. 380 × 210 × 45 mm, Alu CNC, eloxiert |
 
-Das Riverdi-Modul braucht 6–48 V. Das 9-V-Netzteil ist deshalb Pflicht, USB dient nur für Daten.
+Das Riverdi-Modul braucht 6–48 V. Das 9-V-Netzteil ist deshalb Pflicht. USB dient nur für Daten; als Host liefert das Display 5 V (max. 500 mA) an VBUS, der Player selbst hat sein eigenes Netzteil.
 
 ## Aufgabenverteilung im STM32H757
 
-- **M7-Kern:** Oberfläche mit LVGL
-- **M4-Kern:** USB-MIDI, Kemper-SysEx-Protokoll, Footswitches, Drehgeber, LEDs, Expression-Pedal
+- **M7-Kern:** Oberfläche mit LVGL, USB-Host und Kemper-SysEx-Protokoll (eigener FreeRTOS-Task, siehe `firmware/CM7/USB/`), Footswitches
+- **M4-Kern:** derzeit ungenutzt; vorgesehen für LEDs und Expression-Pedal
+
+Die USB-Anbindung läuft vorerst auf dem M7: Die Daten landen dort direkt im Modell der Oberfläche, ohne Umweg über gemeinsamen Speicher zwischen den Kernen. Falls die Last später zu hoch wird, lässt sich `kemper_link` auf den M4 verschieben.
 
 ## Einkaufsliste (Prototyp, Richtwerte)
 

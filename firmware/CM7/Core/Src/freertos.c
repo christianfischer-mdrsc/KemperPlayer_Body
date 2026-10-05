@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lvgl/lvgl.h"
+#include "kemper_link.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -150,6 +151,9 @@ void MX_FREERTOS_Init(void) {
   osThreadStaticDef(lvgl_timer, LVGLTimer, osPriorityNormal, 0,
                     LVGL_TASK_STACK_WORDS, lvgl_task_stack, &lvgl_task_tcb);
   lvgl_timerHandle = osThreadCreate(osThread(lvgl_timer), NULL);
+
+  /* USB-Host + Verbindung zum Kemper Player */
+  kemper_link_start();
   /* USER CODE END RTOS_THREADS */
 
 }

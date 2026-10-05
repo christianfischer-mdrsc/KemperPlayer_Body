@@ -99,6 +99,31 @@ Ohne Verdrahtung testen: Der Taster **BTN1** auf dem Board (PC6) wirkt wie FS1. 
 
 **Uhrzeit:** Beim allerersten Start stellt die Firmware den RTC auf den Zeitpunkt des Builds (`__DATE__`/`__TIME__`) und merkt sich das im Backup-Register. Der RTC läuft derzeit mit dem internen LSI-Oszillator, geht also ungenau und behält die Zeit ohne Versorgung nicht. Für eine dauerhaft richtige Uhr braucht es LSE (32,768-kHz-Quarz) und eine Pufferung an VBAT.
 
+## Kemper-Verbindung (USB)
+
+Das Display ist **USB-Host**, der Kemper Player hängt mit seiner **USB-B-Buchse** daran (dieselbe Buchse wie für den Rig Manager am PC; der Rig Manager kann stattdessen über WLAN laufen).
+
+**Anschluss:** Die USB-Schnittstelle des Riverdi-Boards ist der 5-polige Molex-Stecker **P10 „USB“** (1,25 mm): 1 = VCC_USB, 2 = D−, 3 = D+, 4 = ID, 5 = GND. Für den Host-Modus **Pin 4 (ID) auf GND** legen; dann liefert das Board 5 V (max. 500 mA). Am einfachsten: Adapterkabel Molex 51021-0500 → USB-A-Buchse, dann ein normales USB-A-auf-B-Kabel zum Player.
+
+**Was die Firmware macht** (`firmware/CM7/USB/`):
+
+1. Der USB-Host erkennt den Player und sucht dessen MIDI-Interface. Dabei liest er aus den USB-Deskriptoren **Modell, Hersteller, Seriennummer, USB-Kennung (VID:PID) und Geräterevision**.
+2. Das Display schaltet den Player mit dem Kemper-„Beacon“ in den bidirektionalen SysEx-Modus. Der Player schickt dann etwa alle 500 ms ein Lebenszeichen.
+3. Als Testdaten werden **Rig-Name, Amp, Cab und Rig-Tempo** abgefragt (alle 3 s neu). Amp, Cab und Tempo gehen auch in die Live-Ansicht.
+4. Zusätzlich fragt das Display per MIDI-Identity-Request nach der Firmware-Kennung. Kemper dokumentiert diese Antwort nicht; kommt keine, steht in den Einstellungen „vom Kemper nicht gemeldet“. Eine dokumentierte MIDI-Abfrage für OS-Version oder Seriennummer gibt es nicht, deshalb kommt die Seriennummer aus USB.
+
+**Überwachung:** USB abgezogen wird sofort erkannt. Bleiben die Lebenszeichen 1,5 s aus, gilt die Verbindung als unterbrochen; das Display versucht dann alle 2 s neu zu verbinden. Die Statusleiste zeigt „Kemper verbunden“ nur, solange Lebenszeichen kommen.
+
+**Anzeige:** *System* (Zahnrad) → Abschnitt **Kemper-Verbindung**: Status mit Verbindungsdauer, Modell, Seriennummer, USB-Kennung, Firmware, Rig, Amp/Cab, Tempo, Alter des letzten Lebenszeichens, Zähler für Nachrichten und Unterbrechungen sowie die USB-Versorgung.
+
+**Zum Prüfen am Board:**
+
+- `USBH_VBUS_ON_LEVEL` in `CM7/USB/usbh_conf.h`: Der VBUS-Schalter (USB1_EN, PF10) ist als *aktiv high* angenommen. Liegen im Host-Modus keine 5 V an P10 Pin 1, dort umdrehen.
+- `USBH_OVERCURRENT_ACTIVE`: Die Überstrom-Meldung (PC15) ist als *aktiv low* angenommen. Steht in den Einstellungen dauerhaft „Ueberstrom gemeldet!“, obwohl die rote LED „USB OVR“ aus ist, dort umdrehen.
+- Zeigt der Status „USB-Geraet ohne MIDI gefunden“, hat die Enumeration das MIDI-Interface nicht gefunden. Dann `USBH_MAX_NUM_INTERFACES` / `USBH_MAX_SIZE_CONFIGURATION` in `usbh_conf.h` erhöhen.
+
+**CubeMX:** Die USB-Teile sind von Hand eingebunden. Wer das Projekt mit CubeMX neu erzeugt, muss in `CM7/Core/Inc/stm32h7xx_hal_conf.h` wieder `HAL_HCD_MODULE_ENABLED` setzen (oder in CubeMX USB_OTG_HS auf *Host_Only* stellen, ohne die ST-Middleware „USB_HOST“ zu aktivieren).
+
 ## Aufbau des Repositorys
 
 ```
@@ -116,6 +141,13 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── ui_settings.c         System (Level, Footswitch-Modus, Helligkeit, Uhr, Info)
 │   ├── ui_statusbar.c / .h   Statusleiste: USB-Status, Datum, Uhrzeit
 │   └── xml/                  Frühere Ansichten als LVGL-XML (veraltet, nur Referenz)
+├── CM7/USB/                  Verbindung zum Kemper
+│   ├── usbh_conf.c / .h      USB-Host auf USB_OTG_HS (internes FS-PHY), VBUS, Grenzen
+│   ├── usbh_midi.c / .h      USB-MIDI-Klasse: MIDI-Interface suchen, senden/empfangen,
+│   │                         Hersteller/Produkt/Seriennummer lesen
+│   └── kemper_link.c / .h    Eigener Task: SysEx-Protokoll, Beacon, Verbindungsüberwachung,
+│                             Testdaten; Übergabe an das Modell im LVGL-Task
+├── Middlewares/ST/STM32_USB_Host_Library/   ST USB Host Library v3.5.3 (Core, ein Patch)
 ├── CM7/Core/Src/main.c       Startbildschirm, Init-Schritte, dann ui_start()
 ├── CM7/Core/Src/footswitch.c Footswitches am Expansion-Header (Entprellen, langer Druck)
 ├── CM7/Core/Src/rtc.c        RTC als Zeitquelle für die Statusleiste, Uhr stellen
@@ -127,10 +159,10 @@ docs/                         Konzept, Einkaufsliste, Kemper-Protokoll, Bilder
 
 ## Nächste Schritte
 
-- [ ] USB-MIDI-Device auf dem M4-Kern (TinyUSB), erste Kemper-Befehle
+- [x] USB-Verbindung zum Kemper (Display als USB-Host), Geräteinfos, Verbindungsüberwachung
 - [x] Datenmodell des Players (Banks, Rigs, Module, Effect Buttons) und Anbindung an die Oberfläche
 - [x] Screens: Bank-Übersicht, Tuner, System, Modul- und Parameter-Dialoge
-- [ ] kp_link_* / kp_rx_* mit USB-MIDI füllen (Rig laden, Effekte, Tempo, Tuner, Namen)
+- [ ] kp_link_* / kp_rx_* vollständig mit USB-MIDI füllen (Rig laden, Effekte, Tuner, Bank/Slot) – bisher: Verbindung, Amp/Cab, Tempo
 - [x] Footswitches über den 40-Pin-Header
 - [ ] LED-Ringe (SK6812) an den Footswitches
 - [ ] Fonts mit Umlauten, Einstellungen dauerhaft speichern

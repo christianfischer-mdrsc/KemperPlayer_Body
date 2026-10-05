@@ -36,6 +36,26 @@
 			<locationURI>PARENT-2-PROJECT_LOC/CM7/UI</locationURI>
 		</link>
 		<link>
+			<name>Application/USB</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/CM7/USB</locationURI>
+		</link>
+		<link>
+			<name>Middlewares/USB_Host_Library</name>
+			<type>2</type>
+			<locationURI>PARENT-2-PROJECT_LOC/Middlewares/ST/STM32_USB_Host_Library/Core/Src</locationURI>
+		</link>
+		<link>
+			<name>Drivers/STM32H7xx_HAL_Driver/stm32h7xx_hal_hcd.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hcd.c</locationURI>
+		</link>
+		<link>
+			<name>Drivers/STM32H7xx_HAL_Driver/stm32h7xx_ll_usb.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_ll_usb.c</locationURI>
+		</link>
+		<link>
 			<name>Middlewares/LVGL</name>
 			<type>2</type>
 			<locationURI>PARENT-2-PROJECT_LOC/Middlewares/Third_Party/LVGL</locationURI>
