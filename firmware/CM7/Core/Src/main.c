@@ -46,6 +46,7 @@
 #include "ui_live.h"
 #include "ui_boot.h"
 #include "kemper_player.h"
+#include "footswitch.h"
 #include "lvgl_port_touch.h"
 #include "lvgl_port_display.h"
 
@@ -217,6 +218,7 @@ Error_Handler();
   lv_refr_now(NULL);
 
   lvgl_touchscreen_init();
+  footswitch_init();                            /* Footswitches am Expansion-Header */
   ui_boot_step(1, NULL);                        /* Touch */
   lv_refr_now(NULL);
 
