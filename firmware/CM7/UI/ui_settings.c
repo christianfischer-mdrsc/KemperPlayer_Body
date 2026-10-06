@@ -1,21 +1,22 @@
 /**
  * @file ui_settings.c
  * System: Ausbaustufe des Players, Footswitch-Modus, Display-Helligkeit,
- * Kemper-Verbindung, Datum/Uhrzeit und Info.
+ * Kemper-Verbindung, Rigs einlesen, Datum/Uhrzeit und Info.
  */
 #include <stdio.h>
 #include "ui_common.h"
 #include "ui_screens.h"
 #include "ui_statusbar.h"
 #include "kemper_link.h"
+#include "rig_store.h"
 
 /* Zeilen im Abschnitt "Kemper-Verbindung" */
 enum {
-    KR_USB = 0, KR_RIG1, KR_RIG, KR_STACK, KR_TEMPO, KR_FIRMWARE,
+    KR_USB = 0, KR_POS, KR_RIG, KR_STACK, KR_TEMPO, KR_FIRMWARE,
     KR_SENSE, KR_STATS, KR_COUNT
 };
 static const char * const KR_NAME[KR_COUNT] = {
-    "USB", "Rig 1 (Bank 1)", "Aktuelles Rig", "Amp / Cab", "Rig-Tempo", "Firmware",
+    "USB", "Position", "Aktuelles Rig", "Amp / Cab", "Rig-Tempo", "Firmware",
     "Lebenszeichen", "Nachrichten"
 };
 
@@ -35,7 +36,18 @@ static struct {
     lv_obj_t * k_state;
     lv_obj_t * k_val[KR_COUNT];
     lv_timer_t * k_timer;
+    lv_obj_t * scan_btn;           /* Rigs einlesen */
+    lv_obj_t * scan_btn_lbl;
+    lv_obj_t * scan_bar;
+    lv_obj_t * scan_txt;
 } w;
+
+/* So viele Rigs liest der Scan (ab Bank 1, Rig 1) */
+static uint16_t scan_count(void)
+{
+    uint16_t n = (uint16_t)(kp_bank_count() * KP_RIGS_PER_BANK);
+    return n > KP_DETAIL_RIGS ? KP_DETAIL_RIGS : n;
+}
 
 #define YEAR_FIRST 2024
 #define YEAR_COUNT 27
@@ -77,7 +89,14 @@ static void update_link(void)
     } else {
         lv_label_set_text(w.k_val[KR_FIRMWARE], ok ? "vom Kemper nicht gemeldet" : "-");
     }
-    lv_label_set_text(w.k_val[KR_RIG1], i.rig1_name[0] ? i.rig1_name : (ok ? "keine Antwort" : "-"));
+    if (ok && i.rig_index >= 0) {
+        lv_snprintf(buf, sizeof(buf), "Bank %d, Rig %d (MIDI-Kanal %u)",
+                    i.rig_index / KP_RIGS_PER_BANK + 1, i.rig_index % KP_RIGS_PER_BANK + 1,
+                    (unsigned)(i.midi_channel + 1U));
+        lv_label_set_text(w.k_val[KR_POS], buf);
+    } else {
+        lv_label_set_text(w.k_val[KR_POS], ok ? "noch nicht gemeldet" : "-");
+    }
     lv_label_set_text(w.k_val[KR_RIG], i.rig_name[0] ? i.rig_name : "-");
     if (i.amp_name[0] || i.cab_name[0]) {
         lv_snprintf(buf, sizeof(buf), "%s / %s", i.amp_name[0] ? i.amp_name : "-",
@@ -112,6 +131,59 @@ static void update_link(void)
     if (i.usb_errors && n > 0 && (uint32_t)n < sizeof(buf))
         lv_snprintf(buf + n, sizeof(buf) - (uint32_t)n, ", %lu USB-Fehler", (unsigned long)i.usb_errors);
     lv_label_set_text(w.k_val[KR_STATS], buf);
+
+    /* Rigs einlesen */
+    const bool run = i.scan_state == KL_SCAN_RUNNING;
+    lv_label_set_text(w.scan_btn_lbl, run ? "Abbrechen" : "Alle Rigs einlesen");
+    if (ok || run) lv_obj_remove_state(w.scan_btn, LV_STATE_DISABLED);
+    else           lv_obj_add_state(w.scan_btn, LV_STATE_DISABLED);
+
+    const char * saved = kemper_link_scan_save_text();
+    switch (i.scan_state) {
+    case KL_SCAN_RUNNING:
+        lv_snprintf(buf, sizeof(buf), "Lese Rig %u von %u (Bank %u, Rig %u) ...",
+                    (unsigned)(i.scan_pos + 1U), (unsigned)i.scan_total,
+                    (unsigned)(i.scan_pos / KP_RIGS_PER_BANK + 1U),
+                    (unsigned)(i.scan_pos % KP_RIGS_PER_BANK + 1U));
+        break;
+    case KL_SCAN_DONE:
+        lv_snprintf(buf, sizeof(buf), "%u von %u Rigs eingelesen, %s", (unsigned)i.scan_ok,
+                    (unsigned)i.scan_total, saved[0] ? saved : "nicht gespeichert");
+        break;
+    case KL_SCAN_CANCELLED:
+        lv_snprintf(buf, sizeof(buf), "Abgebrochen nach %u Rigs%s%s", (unsigned)i.scan_ok,
+                    saved[0] ? ", " : "", saved);
+        break;
+    case KL_SCAN_NO_RESPONSE:
+        lv_snprintf(buf, sizeof(buf), "Player wechselt das Rig nicht. MIDI-Empfang am Player pruefen.");
+        break;
+    case KL_SCAN_IDLE:
+    default: {
+        uint16_t n = kp_store_valid_count();
+        if (n) lv_snprintf(buf, sizeof(buf), "%u Rigs von der SD-Karte geladen", (unsigned)n);
+        else   lv_snprintf(buf, sizeof(buf), "Noch keine Rigs eingelesen (%s)",
+                           rig_store_result_text(rig_store_last_load()));
+        break;
+    }
+    }
+    lv_label_set_text(w.scan_txt, buf);
+    if (run || i.scan_state == KL_SCAN_DONE) {
+        lv_obj_remove_flag(w.scan_bar, LV_OBJ_FLAG_HIDDEN);
+        lv_bar_set_range(w.scan_bar, 0, i.scan_total ? i.scan_total : 1);
+        lv_bar_set_value(w.scan_bar, run ? i.scan_pos : i.scan_total, LV_ANIM_OFF);
+    } else {
+        lv_obj_add_flag(w.scan_bar, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void scan_cb(lv_event_t * e)
+{
+    (void)e;
+    kl_info_t i;
+    kemper_link_get_info(&i);
+    if (i.scan_state == KL_SCAN_RUNNING) kemper_link_scan_cancel();
+    else                                 (void)kemper_link_scan_start(scan_count());
+    update_link();
 }
 
 static void link_timer_cb(lv_timer_t * t)
@@ -307,6 +379,29 @@ lv_obj_t * ui_settings_build(void)
         lv_obj_set_flex_grow(w.k_val[k], 1);
         lv_label_set_long_mode(w.k_val[k], LV_LABEL_LONG_DOT);
     }
+
+    /* Rigs einlesen */
+    p = section(right, "Rigs vom Kemper");
+    r = ui_row(p, 12);
+    lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    w.scan_btn = ui_button(r, "Alle Rigs einlesen", &lv_font_montserrat_18, true);
+    w.scan_btn_lbl = lv_obj_get_child(w.scan_btn, 0);
+    lv_obj_add_event_cb(w.scan_btn, scan_cb, LV_EVENT_CLICKED, NULL);
+    w.scan_bar = lv_bar_create(r);
+    lv_obj_set_height(w.scan_bar, 10);
+    lv_obj_set_width(w.scan_bar, 1);
+    lv_obj_set_flex_grow(w.scan_bar, 1);
+    lv_obj_set_style_bg_color(w.scan_bar, lv_color_hex(UI_COL_LINE), 0);
+    lv_obj_set_style_bg_color(w.scan_bar, lv_color_hex(COL_OK), LV_PART_INDICATOR);
+    w.scan_txt = ui_label(p, "", UI_COL_TEXT2, &lv_font_montserrat_16);
+    lv_obj_set_width(w.scan_txt, LV_PCT(100));
+    lv_label_set_long_mode(w.scan_txt, LV_LABEL_LONG_WRAP);
+    lv_obj_t * shint = ui_label(p, "Der Player schaltet dabei hoerbar durch alle Rigs (15 s bis eine "
+                                   "Minute) und laedt danach wieder das aktuelle Rig. Das Ergebnis "
+                                   "wird auf der SD-Karte gespeichert und beim Start geladen.",
+                                UI_COL_TEXT3, &lv_font_montserrat_14);
+    lv_obj_set_width(shint, LV_PCT(100));
+    lv_label_set_long_mode(shint, LV_LABEL_LONG_WRAP);
 
     /* Datum und Uhrzeit */
     p = section(right, "Datum und Uhrzeit");
