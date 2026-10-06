@@ -34,6 +34,9 @@ extern "C" {
 #define KP_FX_BUTTONS      4         /* Effect Buttons I-IIII */
 #define KP_FOOTSWITCHES    6
 #define KP_TAP_TIMEOUT_MS  2000
+/* Fuer so viele Rigs (ab Bank 1) werden alle Details gespeichert; die Namen
+ * gibt es fuer alle Banks. 125 = 25 Banks, reicht fuer Level I/II (50). */
+#define KP_DETAIL_RIGS     125
 
 /* Ausbaustufe des Players */
 typedef enum {
@@ -78,6 +81,7 @@ typedef enum {
 typedef struct {
     const char * name;
     kp_cat_t     cat;
+    uint16_t     kid;    /* Typnummer beim Kemper (Parameter 0 der Slot-Seite) */
 } kp_effect_t;
 
 typedef struct {
@@ -154,6 +158,21 @@ typedef struct {
     bool        edited;                  /* seit dem Laden veraendert */
 } kp_rig_t;
 
+/* Daten eines Rigs, wie sie der Kemper liefert (USB-Anbindung -> Modell) */
+typedef struct {
+    char     name[KP_NAME_LEN];
+    char     amp[KP_NAME_LEN];
+    char     cab[KP_NAME_LEN];
+    uint16_t mod_kid[KP_MOD_COUNT];      /* Kemper-Typnummer, 0 = leer */
+    uint8_t  mod_on;                     /* Bitmaske: Modul an */
+    uint8_t  mod_valid;                  /* Bitmaske: Typ empfangen */
+    bool     tempo_valid;
+    bool     tempo_on;
+    uint16_t tempo_bpm;
+    int16_t  param[KP_P_COUNT];
+    uint32_t param_valid;                /* Bitmaske ueber kp_param_t */
+} kp_rig_data_t;
+
 /* Footswitch-Belegung */
 typedef enum {
     KP_FS_MODE_RIGS = 0,   /* FS1-5 = Rig 1-5 der Bank, FS6 = Effekt-Modus */
@@ -198,9 +217,13 @@ bool        kp_module_available(kp_mod_t m);
 uint8_t     kp_chain(uint8_t out[KP_CHAIN_MAX]);
 const char *kp_module_name(kp_mod_t m);         /* "A", "B", ..., "REV" */
 
-/* Effektkatalog */
-uint8_t            kp_effect_count(void);       /* inkl. Eintrag 0 = leer */
+/* Effektkatalog. Die ersten kp_effect_count() Eintraege sind die Typen,
+ * die man am Display auswaehlen kann (Level I); dahinter folgen alle
+ * weiteren Kemper-Typen, die vom Kemper gemeldet werden koennen. */
+uint8_t            kp_effect_count(void);       /* auswaehlbar, inkl. 0 = leer */
+uint8_t            kp_effect_total(void);       /* alle Eintraege */
 const kp_effect_t *kp_effect(uint8_t type);
+uint8_t            kp_effect_from_kemper(uint16_t kid);   /* unbekannt -> eigener Eintrag */
 const char        *kp_cat_name(kp_cat_t c);
 uint32_t           kp_cat_color(kp_cat_t c);
 
@@ -277,6 +300,10 @@ void kp_rx_connected(bool connected);
 void kp_rx_level(kp_level_t level);
 void kp_rx_rig_name_at(uint8_t bank, uint8_t slot, const char * name);
 void kp_rx_rig_loaded(uint8_t bank, uint8_t slot);
+/* Alle Daten eines Rigs; index = bank * 5 + slot, -1 = aktuelles Rig
+ * (Position unbekannt). Wird gespeichert und, falls es das geladene Rig
+ * ist, sofort angezeigt. */
+void kp_rx_rig_details(int16_t index, const kp_rig_data_t * d);
 void kp_rx_stack(const char * amp, const char * cab);
 void kp_rx_module(kp_mod_t m, uint8_t type, bool on);
 void kp_rx_param(kp_param_t p, int16_t value);
@@ -285,6 +312,17 @@ void kp_rx_tuner(bool signal, const char * note, int8_t cents);
 /* Neue Verbindungsdaten (Seriennummer, Status ...) fuer die Anzeige,
  * abzufragen mit kemper_link_get_info(); meldet KP_CHG_SYSTEM */
 void kp_rx_link_info(void);
+
+/* ---------------------------------------------------------------------
+ * Gespeicherte Rig-Details (fuer rig_store.c: SD-Karte)
+ * ------------------------------------------------------------------ */
+/* NULL, wenn fuer dieses Rig (index = bank * 5 + slot) nichts vorliegt */
+const kp_rig_t *kp_store_rig(uint16_t index);
+uint16_t    kp_store_valid_count(void);
+/* Beim Laden von der SD-Karte: ein Rig eintragen (r = NULL: leeren) */
+void        kp_store_put(uint16_t index, const kp_rig_t * r);
+/* Nach dem Laden einmal aufrufen: Anzeige aktualisieren */
+void        kp_store_loaded(void);
 
 /* ---------------------------------------------------------------------
  * Board-Funktionen (schwach definiert, auf dem Board ueberschrieben)

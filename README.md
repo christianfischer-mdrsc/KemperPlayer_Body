@@ -111,16 +111,21 @@ Das Display ist ein **USB-MIDI-Gerät** (class compliant, wie MIDI Captain & Co.
 
 1. Das Display meldet sich am Player als MIDI-Gerät „Kemper Player Display“ an.
 2. Es schaltet den Player mit dem Kemper-„Beacon“ in den bidirektionalen SysEx-Modus. Der Player schickt dann etwa alle 500 ms ein Lebenszeichen und meldet Änderungen (z. B. Rig-Name) von selbst.
-3. Als Test der Übertragung werden abgefragt (alle 3 s neu): **Name von Rig 1 in Bank 1**, Name des aktuellen Rigs, Amp, Cab und Rig-Tempo. Der Name von Rig 1 landet auch in der Bank-Übersicht und auf FS1; Amp, Cab und Tempo in der Live-Ansicht.
-4. Zusätzlich fragt das Display per MIDI-Identity-Request nach einer Firmware-Kennung. Kemper dokumentiert diese Antwort nicht; kommt keine, steht dort „vom Kemper nicht gemeldet“.
+3. Es verfolgt Rig-Wechsel am Player: Der Player meldet jedes geladene Rig mit CC 32 + Program Change (Index = Bank × 5 + Rig). Das Display springt mit und liest die Daten des geladenen Rigs (danach alle 3 s neu, damit am Player geschaltete Effekte ankommen).
+4. Rigs, die am Display gewählt werden (Bank-Übersicht, Footswitches), lädt es per CC 32 + Program Change auch am Player. Den MIDI-Kanal übernimmt es aus den Meldungen des Players (sonst Kanal 1).
+5. Zusätzlich fragt das Display per MIDI-Identity-Request nach einer Firmware-Kennung. Kemper dokumentiert diese Antwort nicht; kommt keine, steht dort „vom Kemper nicht gemeldet“.
 
-Die Abfrage für Rig 1 nutzt die erweiterte String-Adresse `00 00 01 00 01` (Funktion 0x47). Sie ist nicht offiziell dokumentiert, laut Kemper-Forum liefert der Player damit aber den Namen von Bank 1 / Rig 1. Kommt keine Antwort, zeigt die Zeile „keine Antwort“ – der aktuelle Rig-Name (offiziell dokumentiert) bestätigt die Übertragung dann trotzdem.
+**Gelesen wird je Rig:** Name, Amp, Cab, Rig-Tempo (an/aus), Effekttyp und an/aus jedes Slots (A, B, DLY, REV; bei Level III auch C, D, X, MOD) sowie Rig Volume, Transpose, Noise Gate, Clean Sens, Gain, Definition, Bass, Middle, Treble, Presence. Die Effekttypen kommen als Kemper-Typnummer und werden im Katalog (`kemper_player.c`) auf Name und Farbe abgebildet, inklusive der Level-II/III-Typen. Die Parameter-Adressen der Input-, Amp- und EQ-Seiten (09/0A/0B) stammen aus der Kemper-Doku und sind am Player noch zu bestätigen. Nicht lesbar ist die Zuweisung der Effect Buttons I–IIII; die bleibt, wie am Display eingestellt, im Rig gespeichert.
+
+**Alle Rigs einlesen:** Der Kemper liefert Daten nur für das gerade geladene Rig. *System* → **Rigs vom Kemper** → „Alle Rigs einlesen“ lädt deshalb nacheinander jedes Rig (Level I/II: 50, Level III: die ersten 125), liest es aus und lädt am Ende wieder das Ausgangs-Rig. Das ist hörbar und dauert etwa 15 s, ohne Rückmeldung des Players bis eine Minute. Bestätigt der Player einen Wechsel nicht, prüft das Display den Rig-Namen; liefert er zweimal hintereinander denselben Namen wie das vorige Rig, bricht der Scan mit einem Hinweis ab (MIDI-Empfang des Players prüfen). War die Position des Ausgangs-Rigs unbekannt, wird es am Namen wiedererkannt.
+
+**SD-Karte:** Das Ergebnis landet als `RIGS.BIN` auf der microSD-Karte (FAT32) und wird beim Start geladen; danach zeigen Bank-Übersicht, Footswitches und Live-Ansicht jedes Rig sofort mit Effekten an. Die Karte wird von `CM7/UI/rig_store.c` ohne DMA im Polling-Betrieb mit Hardware-Flusssteuerung angesprochen (eigener FatFs-Treiber statt `sd_diskio.c`, dessen DMA-Pfad ohne Cache-Pflege mit dem aktiven D-Cache nicht sicher wäre). Datei von einer anderen Firmware-Version: wird ignoriert, einfach neu einlesen.
 
 **Überwachung:** Kabel ab oder Player aus wird über den USB-Zustand erkannt. Bleiben die Lebenszeichen 1,5 s aus, gilt die Verbindung als unterbrochen; das Display versucht dann alle 2 s neu zu verbinden. Die Statusleiste zeigt „Kemper verbunden“ nur, solange Lebenszeichen kommen.
 
-**Anzeige:** *System* (Zahnrad) → Abschnitt **Kemper-Verbindung**: Status mit Verbindungsdauer, USB-Zustand, Rig 1 (Bank 1), aktuelles Rig, Amp/Cab, Tempo, Firmware, Alter des letzten Lebenszeichens und Zähler für Nachrichten und Unterbrechungen.
+**Anzeige:** *System* (Zahnrad) → Abschnitt **Kemper-Verbindung**: Status mit Verbindungsdauer, USB-Zustand, Position (Bank/Rig, MIDI-Kanal), aktuelles Rig, Amp/Cab, Tempo, Firmware, Alter des letzten Lebenszeichens und Zähler für Nachrichten und Unterbrechungen.
 
-**Senden von Aktionen** (nächster Schritt): Rig laden per Program Change, Effekte per CC 17–29, Tap per CC 30, Tuner per CC 31, Parameter per SysEx. Dafür werden die vorbereiteten `kp_link_*`-Funktionen in `kemper_link.c` gefüllt.
+**Senden von Aktionen** (nächster Schritt): Rig laden ist fertig; offen sind Effekte per CC 17–29, Tap per CC 30, Tuner per CC 31, Parameter per SysEx. Dafür werden die vorbereiteten `kp_link_*`-Funktionen in `kemper_link.c` gefüllt.
 
 **USB-Takt:** Der USB-Takt kommt vom internen 48-MHz-Oszillator (HSI48). Damit er die USB-Toleranz sicher einhält, gleicht ihn der Clock Recovery System (CRS) laufend an die 1-ms-Rahmen des Players an (`usbd_conf.c`).
 
@@ -142,7 +147,9 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── ui_edit.c             Bearbeiten-Ansicht, Modul-Dialog, Umbenennen
 │   ├── ui_banks.c            Bank-Übersicht
 │   ├── ui_tuner.c            Tuner
-│   ├── ui_settings.c         System (Level, Footswitch-Modus, Helligkeit, Kemper-Verbindung, Uhr, Info)
+│   ├── ui_settings.c         System (Level, Footswitch-Modus, Helligkeit, Kemper-Verbindung,
+│   │                         Rigs einlesen, Uhr, Info)
+│   ├── rig_store.c / .h      Eingelesene Rigs auf der SD-Karte (RIGS.BIN), eigener SD-Treiber
 │   ├── ui_statusbar.c / .h   Statusleiste: USB-Status, Datum, Uhrzeit
 │   └── xml/                  Frühere Ansichten als LVGL-XML (veraltet, nur Referenz)
 ├── CM7/USB/                  Verbindung zum Kemper
@@ -150,8 +157,9 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── usbd_desc.c / .h      Geräte- und String-Deskriptoren
 │   ├── usbd_midi.c / .h      USB-MIDI-Klasse (MIDI 1.0), Empfangspuffer, Senden
 │   └── kemper_link.c / .h    Eigener Task: SysEx-Protokoll, Beacon, Verbindungsüberwachung,
-│                             Testdaten; Übergabe an das Modell im LVGL-Task
+│                             Rig-Wechsel, Rig-Daten, Scan aller Rigs; Übergabe ans Modell
 ├── Middlewares/ST/STM32_USB_Device_Library/   ST USB Device Library v2.11.3 (Core)
+├── test/kemper_link_sim/     PC-Test: kemper_link.c + Modell gegen nachgebildeten Player (`make`)
 ├── CM7/Core/Src/main.c       Startbildschirm, Init-Schritte, dann ui_start()
 ├── CM7/Core/Src/footswitch.c Footswitches am Expansion-Header (Entprellen, langer Druck)
 ├── CM7/Core/Src/rtc.c        RTC als Zeitquelle für die Statusleiste, Uhr stellen
@@ -166,7 +174,8 @@ docs/                         Konzept, Einkaufsliste, Kemper-Protokoll, Bilder
 - [x] USB-MIDI-Gerät (M7) am USB-A des Players, Verbindungsüberwachung, erste Daten vom Kemper
 - [x] Datenmodell des Players (Banks, Rigs, Module, Effect Buttons) und Anbindung an die Oberfläche
 - [x] Screens: Bank-Übersicht, Tuner, System, Modul- und Parameter-Dialoge
-- [ ] kp_link_* / kp_rx_* vollständig mit USB-MIDI füllen (Rig laden, Effekte, Tuner, Bank/Slot) – bisher: Verbindung, Rig 1, Amp/Cab, Tempo
+- [x] Alle Rigs mit Effekten einlesen, auf SD speichern; Rig-Wechsel in beide Richtungen
+- [ ] kp_link_* für Effekte an/aus, Effect Buttons, Tap, Tuner, Parameter füllen
 - [x] Footswitches über den 40-Pin-Header
 - [ ] LED-Ringe (SK6812) an den Footswitches
 - [ ] Fonts mit Umlauten, Einstellungen dauerhaft speichern
