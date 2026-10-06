@@ -39,6 +39,19 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef * hpcd)
     }
     HAL_PWREx_EnableUSBVoltageDetector();
 
+    /* HSI48 ist ohne Nachfuehrung fuer USB zu ungenau (Toleranz +-0,25 %).
+     * Der CRS gleicht ihn laufend an den 1-ms-SOF des Kemper an
+     * (USB1 = OTG_HS; so macht es auch das CubeMX-Beispiel). */
+    __HAL_RCC_CRS_CLK_ENABLE();
+    RCC_CRSInitTypeDef crs = {0};
+    crs.Prescaler             = RCC_CRS_SYNC_DIV1;
+    crs.Source                = RCC_CRS_SYNC_SOURCE_USB1;
+    crs.Polarity              = RCC_CRS_SYNC_POLARITY_RISING;
+    crs.ReloadValue           = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000U, 1000U);
+    crs.ErrorLimitValue       = RCC_CRS_ERRORLIMIT_DEFAULT;
+    crs.HSI48CalibrationValue = RCC_CRS_HSI48CALIBRATION_DEFAULT;
+    HAL_RCCEx_CRSConfig(&crs);
+
     __HAL_RCC_USB_OTG_HS_CLK_ENABLE();
     /* Mit internem FS-PHY darf der ULPI-Takt im Sleep nicht laufen */
     __HAL_RCC_USB_OTG_HS_ULPI_CLK_SLEEP_DISABLE();

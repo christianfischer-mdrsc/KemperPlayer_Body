@@ -122,6 +122,8 @@ Die Abfrage für Rig 1 nutzt die erweiterte String-Adresse `00 00 01 00 01` (Fun
 
 **Senden von Aktionen** (nächster Schritt): Rig laden per Program Change, Effekte per CC 17–29, Tap per CC 30, Tuner per CC 31, Parameter per SysEx. Dafür werden die vorbereiteten `kp_link_*`-Funktionen in `kemper_link.c` gefüllt.
 
+**USB-Takt:** Der USB-Takt kommt vom internen 48-MHz-Oszillator (HSI48). Damit er die USB-Toleranz sicher einhält, gleicht ihn der Clock Recovery System (CRS) laufend an die 1-ms-Rahmen des Players an (`usbd_conf.c`).
+
 **USB-Kennung:** VID/PID 0x1209/0x0001 (von pid.codes für private Tests freigegeben). Für eine Weitergabe des Geräts bräuchte es eine eigene PID.
 
 **CubeMX:** Die USB-Teile sind von Hand eingebunden. Wer das Projekt mit CubeMX neu erzeugt, muss in `CM7/Core/Inc/stm32h7xx_hal_conf.h` wieder `HAL_PCD_MODULE_ENABLED` setzen (oder in CubeMX USB_OTG_HS auf *Device_Only* stellen, ohne die ST-Middleware „USB_DEVICE“ zu aktivieren).
