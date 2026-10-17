@@ -4,13 +4,27 @@ Eigenbau-Controller für den **Kemper Profiler Player**: 7"-Touch-Display (River
 
 ## Vorschau
 
-**Live-Ansicht** (zum Spielen, große Schrift) – so startet das Display ohne Kemper, alle Rigs sind leer:
+**Startseite** mit quadratischen Kacheln in der Mitte:
+
+![Startseite](docs/images/vorschau_startseite.png)
+
+**Live-Ansicht** (zum Spielen) – alle Effekte als Kacheln entlang des Signalwegs: Transpose (klein, am Eingang), Gate, Comp, Boost, Wah, Chorus, die Module A/B, Stack, DLY/REV, Air Chorus und Doubler bis zum Ausgang. So startet das Display ohne Kemper:
 
 ![Live-Ansicht](docs/images/vorschau_live.png)
 
-Dieselbe Ansicht, nachdem am Display Effekte gewählt, das Rig umbenannt und das Tempo getippt wurde:
+Mit Kemper (Level I/II) und bei Level III mit allen Modulen (kleinere Kacheln); FS5 und FS6 schalten hier Fixed Effects:
 
 ![Live-Ansicht mit Effekten](docs/images/vorschau_live_effekte.png)
+
+![Live-Ansicht Level III](docs/images/vorschau_live_level3.png)
+
+Fixed Effect halten → Werte einstellen; Transpose halten → Tonhöhe; Footswitch-Feld halten → Belegung:
+
+![Fixed Effect einstellen](docs/images/vorschau_fixed_effect.png)
+
+![Transpose](docs/images/vorschau_transpose.png)
+
+![Footswitch belegen](docs/images/vorschau_fs_belegen.png)
 
 **Bearbeiten-Ansicht** (zum Einstellen) und der Dialog eines Effektmoduls:
 
@@ -70,9 +84,9 @@ Die Oberfläche bildet nur den **Kemper Profiler Player** ab: Banks mit je 5 Rig
 
 | Ansicht | Was funktioniert |
 |---|---|
-| **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht, Effektmodul antippen → ein/aus, **halten → Einstellungen** (Werte live vom Kemper), Fixed Effects (6 nach Input, 2 vor Output) antippen → ein/aus, halten → Werte, Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
-| **Footswitch-Leiste** | Modus *Rigs*: FS1–5 = Rig 1–5, FS6 → Effekte. Modus *Effekte*: FS1–4 = Effect Button I–IIII, FS5 = Tap, FS6 → Rigs |
-| **Bearbeiten** | Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons, Einstellungen; Modul halten → Einstellungen; Fixed Effects wie in Live; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
+| **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht. Signalweg mit allen Effekten als Kacheln: antippen → ein/aus, **halten → Einstellungen** (Module: Werte live vom Kemper; Fixed Effects: Werte **einstellbar** per Regler und −/+). Transpose antippen → ein/aus, halten → Tonhöhe in Halbtönen (−36…+36). Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
+| **Footswitch-Leiste** | Antippen = Footswitch drücken, **halten = Belegung wählen**: jeder FS1–FS6 frei mit Effect Button I–IIII, einem Effekt-Modul, einem Fixed Effect, Tap Tempo oder nichts. Standard: FS1–4 = Effect Button I–IIII, FS5 = Tap, FS6 frei |
+| **Bearbeiten** | Startseite (Haus-Symbol), Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons, Einstellungen; Modul halten → Einstellungen; Fixed Effects wie in Live; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
 | **Banks** | Banks seitenweise (je 10), Rig antippen → laden |
 | **Tuner** | Referenz 424–456 Hz, Stummschaltung; Ton und Abweichung kommen vom Kemper |
 | **System** | Player-Level I/II/III, Footswitch-Modus, **Helligkeit** (PWM), **Uhr stellen** (RTC), Info |
@@ -111,10 +125,9 @@ Das Display ist ein **USB-MIDI-Gerät** (class compliant, wie MIDI Captain & Co.
 
 1. Das Display meldet sich am Player als MIDI-Gerät „Kemper Player Display“ an.
 2. Es schaltet den Player mit dem Kemper-„Beacon“ in den bidirektionalen SysEx-Modus. Der Player schickt dann etwa alle 500 ms ein Lebenszeichen und meldet Änderungen (z. B. Rig-Name) von selbst.
-3. Als Test der Übertragung werden abgefragt (alle 3 s neu): **Name von Rig 1 in Bank 1**, Name des aktuellen Rigs, Amp, Cab und Rig-Tempo. Der Name von Rig 1 landet auch in der Bank-Übersicht und auf FS1; Amp, Cab und Tempo in der Live-Ansicht.
-4. Zusätzlich fragt das Display per MIDI-Identity-Request nach einer Firmware-Kennung. Kemper dokumentiert diese Antwort nicht; kommt keine, steht dort „vom Kemper nicht gemeldet“.
-
-Die Abfrage für Rig 1 nutzt die erweiterte String-Adresse `00 00 01 00 01` (Funktion 0x47). Sie ist nicht offiziell dokumentiert, laut Kemper-Forum liefert der Player damit aber den Namen von Bank 1 / Rig 1. Kommt keine Antwort, zeigt die Zeile „keine Antwort“ – der aktuelle Rig-Name (offiziell dokumentiert) bestätigt die Übertragung dann trotzdem.
+3. Abgefragt werden (alle 3 s neu): Name des aktuellen Rigs, Amp, Cab, Rig-Tempo und Transpose; dazu laufend Typ und Ein/Aus der Effekt-Slots und der Fixed Effects.
+4. **Bank und Rig beim Verbinden:** Der Kemper meldet die Position nur per Program Change, und der kommt erst beim nächsten Rig-Wechsel. Bleibt er nach dem Verbinden 1 s aus, fragt das Display mit der Bank-Vorauswahl nach (CC 48 = eine Bank vor, CC 49 = wieder zurück; laut MIDI-Dokumentation ohne Rig-Wechsel). Der Kemper antwortet mit CC 47 (Bank) und ggf. CC 50–54 (Platz). Bis dahin zeigt das Display „Bank ?“ / „Rig ?“ statt fälschlich Bank 1 / Rig 1.
+5. Zusätzlich fragt das Display per MIDI-Identity-Request nach einer Firmware-Kennung. Kemper dokumentiert diese Antwort nicht; kommt keine, steht dort „vom Kemper nicht gemeldet“.
 
 **Überwachung:** Kabel ab oder Player aus wird über den USB-Zustand erkannt. Bleiben die Lebenszeichen 1,5 s aus, gilt die Verbindung als unterbrochen; das Display versucht dann alle 2 s neu zu verbinden. Die Statusleiste zeigt „Kemper verbunden“ nur, solange Lebenszeichen kommen.
 
@@ -137,7 +150,9 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── kemper_player.c / .h  Datenmodell des Players (Banks, Rigs, Module, Effect Buttons,
 │   │                         Parameter, Tempo, Tuner, Footswitches); kp_link_* = Richtung
 │   │                         Kemper (noch leer), kp_rx_* = Daten vom Kemper
-│   ├── ui_common.c / .h      Stile, Navigation, Effektkette, Footswitch-Leiste, Dialoge
+│   ├── ui_common.c / .h      Stile, Navigation, Signalweg, Effektkette, Footswitch-Leiste
+│   │                         (Belegung), Dialoge (Effekte, Fixed Effects, Transpose)
+│   ├── ui_home.c             Startseite mit Kacheln
 │   ├── ui_live.c / .h        Live-Ansicht, Einstieg ui_start(), ui_footswitch()
 │   ├── ui_edit.c             Bearbeiten-Ansicht, Modul-Dialog, Umbenennen
 │   ├── ui_banks.c            Bank-Übersicht
@@ -170,7 +185,9 @@ docs/                         Konzept, Einkaufsliste, Kemper-Protokoll, Bilder
 - [x] Footswitches über den 40-Pin-Header
 - [ ] LED-Ringe (SK6812) an den Footswitches
 - [ ] Fonts mit Umlauten, Einstellungen dauerhaft speichern
-- [ ] Startseite, Setlist-Bereich und Setlist Manager
+- [x] Startseite
+- [ ] Setlist-Bereich und Setlist Manager
+- [ ] Footswitch-Belegung dauerhaft speichern
 
 Mehr zum Konzept in [`docs/konzept.md`](docs/konzept.md).
 

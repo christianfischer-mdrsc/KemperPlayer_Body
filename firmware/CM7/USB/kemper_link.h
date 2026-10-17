@@ -22,7 +22,8 @@
  *    Effects (laufend, Aenderungen am Kemper erscheinen sofort) und schickt
  *    Aenderungen vom Display an den Kemper,
  *  - liest auf Wunsch die Einstellungen eines Effekts, als Text so, wie der
- *    Kemper sie anzeigt (kemper_link_watch()).
+ *    Kemper sie anzeigt (kemper_link_watch()), und setzt sie
+ *    (kemper_link_set_param()).
  *
  * Die Oberflaeche bekommt die Daten nur ueber kemper_link_get_info()
  * (Kopie unter Sperre) bzw. ueber kemper_link_ui_poll() im LVGL-Task.
@@ -81,6 +82,7 @@ typedef struct {
      * eigenen Rig-Wahl. Ungueltig, wenn der Kemper ein anderes Rig meldet,
      * ohne dass bekannt ist, wo es liegt. */
     bool      rig_pos_valid;
+    bool      rig_bank_valid;            /* nur die Bank ist bekannt (CC 47) */
     uint8_t   rig_bank, rig_slot;
     uint32_t  rig_seq;                   /* zaehlt bei jedem Rig-Wechsel hoch */
 
@@ -101,12 +103,17 @@ typedef struct {
     uint8_t   watch_n;                   /* Zahl der Eintraege */
     uint16_t  watch_valid;               /* Bitmaske: Text vorhanden */
     const char * watch_name[KL_WATCH_MAX];
+    uint8_t   watch_steps[KL_WATCH_MAX]; /* 0 = stufenlos, sonst Anzahl der Werte */
+    uint16_t  watch_raw_valid;           /* Bitmaske: Rohwert bekannt */
+    uint16_t  watch_raw[KL_WATCH_MAX];   /* Rohwert 0..16383 */
     char      watch_txt[KL_WATCH_MAX][KL_VAL_LEN];
     char      amp_name[KL_STR_LEN];
     char      cab_name[KL_STR_LEN];
     bool      tempo_valid;
     bool      tempo_on;
     uint16_t  tempo_bpm;
+    bool      transpose_valid;
+    int8_t    transpose;                 /* Halbtoene, -36..+36 */
 
     /* Ueberwachung */
     uint32_t  now_ms;                /* Zeitpunkt der Kopie */
@@ -141,6 +148,12 @@ void kemper_link_ui_poll(void);
  * dann in kl_info_t (watch_*), Aenderungen melden KP_CHG_SYSTEM.
  */
 void kemper_link_watch(kl_watch_t kind, uint8_t idx);
+
+/**
+ * Einen Parameter am Kemper setzen (aus dem LVGL-Task), z. B. eine
+ * Einstellung eines Fixed Effects. Der Wert wird danach neu gelesen.
+ */
+void kemper_link_set_param(uint8_t page, uint8_t nr, uint16_t value);
 
 #ifdef __cplusplus
 }

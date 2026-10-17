@@ -112,7 +112,9 @@ typedef enum {
 typedef struct {
     uint8_t      nr;
     const char * name;
+    uint8_t      steps;  /* 0 = stufenlos (0..16383), sonst Auswahl 0..steps-1 */
 } kp_fx_param_t;
+#define KP_FX_RAW_MAX  16383     /* 14-Bit-Wertebereich der Kemper-Parameter */
 
 /* Einstellbare Parameter, gruppiert wie die Bereiche im Rig Manager */
 typedef enum {
@@ -189,6 +191,20 @@ typedef enum {
     KP_FS_MODE_FX,         /* FS1-4 = Effect Button I-IIII, FS5 = TAP, FS6 = Rig-Modus */
 } kp_fs_mode_t;
 
+/* Was ein Footswitch schaltet (frei waehlbar je FS1-FS6) */
+typedef enum {
+    KP_FSA_NONE = 0,
+    KP_FSA_FX_BUTTON,      /* idx = Effect Button 0..3 (I-IIII) */
+    KP_FSA_MODULE,         /* idx = kp_mod_t */
+    KP_FSA_FIXED,          /* idx = kp_fixed_t */
+    KP_FSA_TAP,
+} kp_fsa_kind_t;
+
+typedef struct {
+    uint8_t kind;          /* kp_fsa_kind_t */
+    uint8_t idx;
+} kp_fs_assign_t;
+
 typedef struct {
     char     top[8];             /* z. B. "FS1" */
     char     main[KP_NAME_LEN];  /* Hauptbeschriftung */
@@ -242,6 +258,10 @@ uint8_t            kp_fx_params(uint16_t type, const kp_fx_param_t ** list);
 /* Banks und Rigs */
 uint8_t     kp_bank(void);                      /* 0-basiert */
 uint8_t     kp_slot(void);                      /* 0..4 */
+/* Ist bekannt, wo das geladene Rig liegt? Nach dem Verbinden erst, wenn der
+ * Kemper Bank bzw. Platz gemeldet hat. */
+bool        kp_bank_known(void);
+bool        kp_slot_known(void);
 const char *kp_rig_name_at(uint8_t bank, uint8_t slot);   /* "" = leer */
 uint32_t    kp_bank_color(uint8_t bank);
 const char *kp_bank_color_name(uint8_t bank);
@@ -301,6 +321,10 @@ void        kp_tuner_set_mute(bool mute);
 kp_fs_mode_t kp_fs_mode(void);
 void        kp_fs_set_mode(kp_fs_mode_t mode);
 void        kp_fs_info(uint8_t idx, kp_fs_info_t * out);
+kp_fs_assign_t kp_fs_assign(uint8_t idx);
+void        kp_fs_set_assign(uint8_t idx, kp_fs_assign_t a);
+/* Beschriftung einer Belegung, z. B. "Effect Button II", "Noise Gate" */
+const char *kp_fs_assign_name(kp_fs_assign_t a);
 /* now_ms: aktuelle Zeit in ms, fuer Tap Tempo */
 void        kp_footswitch(uint8_t idx, uint32_t now_ms);
 
@@ -326,6 +350,10 @@ void kp_rx_connected(bool connected);
 void kp_rx_level(kp_level_t level);
 void kp_rx_rig_name_at(uint8_t bank, uint8_t slot, const char * name);
 void kp_rx_rig_loaded(uint8_t bank, uint8_t slot);
+/* Position des schon geladenen Rigs ist jetzt bekannt (Rig bleibt, wie es ist) */
+void kp_rx_rig_position(uint8_t bank, uint8_t slot);
+/* Nur die Bank ist bekannt, der Platz nicht */
+void kp_rx_bank(uint8_t bank);
 /* Am Kemper ist ein anderes Rig geladen, Bank/Platz unbekannt: Details leeren,
  * Name uebernehmen, Position im Modell bleibt */
 void kp_rx_rig_changed(const char * name);

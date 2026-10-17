@@ -78,6 +78,33 @@ void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact,
 void ui_chain_update(ui_chain_t * c);
 
 /* ---------------------------------------------------------------------
+ * Signalpfad fuer die Live-Ansicht: alle Effekte als kleine Kacheln in der
+ * Reihenfolge des Signalflusses, verbunden durch eine Linie.
+ *   Zeile 1: IN - Transpose - Gate, Comp, Boost, Wah, Chorus - A, B (C, D)
+ *   Zeile 2: STACK - (X, MOD) DLY, REV - Air Chorus, Doubler - OUT
+ * Antippen = ein/aus, Halten = Einstellungen (Transpose: Tonhoehe).
+ * ------------------------------------------------------------------ */
+#define UI_PATH_MAX  (KP_FIX_COUNT - 1 + KP_CHAIN_MAX)
+
+typedef struct {
+    uint8_t    n;
+    uint8_t    kind[UI_PATH_MAX];      /* ui_path_kind_t (ui_common.c) */
+    uint8_t    id[UI_PATH_MAX];        /* kp_fixed_t bzw. kp_mod_t */
+    lv_obj_t * tile[UI_PATH_MAX];
+    lv_obj_t * slot[UI_PATH_MAX];
+    lv_obj_t * name[UI_PATH_MAX];
+    lv_obj_t * state[UI_PATH_MAX];
+    lv_obj_t * tr;                     /* Transpose */
+    lv_obj_t * tr_led;
+    lv_obj_t * tr_val;
+    lv_point_precise_t pts[6];         /* Linie (muss bestehen bleiben) */
+    bool       narrow;                 /* schmale Kacheln (viele Module) */
+} ui_path_t;
+
+void ui_path_create(ui_path_t * p, lv_obj_t * parent, int32_t tile_h);
+void ui_path_update(ui_path_t * p);
+
+/* ---------------------------------------------------------------------
  * Fixed Effects: 6 nach dem Input, 2 vor dem Output.
  * Antippen = ein/aus, Halten = Werte anzeigen.
  * ------------------------------------------------------------------ */
@@ -101,6 +128,7 @@ typedef struct {
     lv_obj_t * led[KP_FOOTSWITCHES];
 } ui_fsbar_t;
 
+/* Antippen = Footswitch druecken, Halten = Belegung waehlen */
 void ui_fsbar_create(ui_fsbar_t * f, lv_obj_t * parent);
 void ui_fsbar_update(ui_fsbar_t * f);
 
@@ -119,6 +147,10 @@ void       ui_param_dialog(kp_section_t sec);
 /* Einstellungen eines Effekts bzw. Fixed Effects, live vom Kemper */
 void       ui_fx_dialog(kp_mod_t m);
 void       ui_fixed_dialog(kp_fixed_t f);
+/* Transpose: ein/aus und Tonhoehe in Halbtoenen */
+void       ui_transpose_dialog(void);
+/* Belegung eines Footswitches (FS1-FS6 = 0..5) waehlen */
+void       ui_fs_assign_dialog(uint8_t fs);
 
 #ifdef __cplusplus
 }

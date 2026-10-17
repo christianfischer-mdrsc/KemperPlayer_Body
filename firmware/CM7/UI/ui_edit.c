@@ -211,7 +211,8 @@ static void update_rig(void)
 {
     const kp_rig_t * r = kp_rig();
     ui_bank_chip_update(w.bank_lbl, w.bank_dot);
-    lv_label_set_text_fmt(w.slot, "Rig %u", (unsigned)(kp_slot() + 1));
+    if (kp_slot_known()) lv_label_set_text_fmt(w.slot, "Rig %u", (unsigned)(kp_slot() + 1));
+    else                 lv_label_set_text(w.slot, "Rig ?");
     if (r->name[0]) {
         lv_label_set_text(w.rig, r->name);
         lv_obj_set_style_text_color(w.rig, lv_color_hex(UI_COL_TEXT), 0);
@@ -254,6 +255,7 @@ static void refresh(uint32_t chg)
 
 static void bank_cb(lv_event_t * e)   { (void)e; ui_nav_go(UI_SCR_BANKS); }
 static void live_cb(lv_event_t * e)   { (void)e; ui_nav_go(UI_SCR_LIVE); }
+static void home_cb(lv_event_t * e)   { (void)e; ui_nav_go(UI_SCR_HOME); }
 static void rename_cb(lv_event_t * e) { (void)e; rename_dialog(); }
 static void tap_cb(lv_event_t * e)    { (void)e; kp_tap(lv_tick_get()); }
 
@@ -328,8 +330,10 @@ lv_obj_t * ui_edit_build(void)
     lv_obj_t * body;
     lv_obj_t * scr = ui_screen_base(&body);
 
-    /* Kopfzeile: Bank, Live, Bereiche */
+    /* Kopfzeile: Startseite, Bank, Live, Bereiche */
     lv_obj_t * head = ui_row(body, 6);
+    lv_obj_t * home = ui_icon_button(head, LV_SYMBOL_HOME, false);
+    lv_obj_add_event_cb(home, home_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t * chip = ui_bank_chip(head, &w.bank_lbl, &w.bank_dot);
     lv_obj_add_event_cb(chip, bank_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t * live = ui_icon_button(head, LV_SYMBOL_PLAY, true);
@@ -366,9 +370,12 @@ lv_obj_t * ui_edit_build(void)
     lv_obj_set_height(mr, 52);
     lv_obj_set_style_pad_hor(mr, 12, 0);
     ui_label(mr, "Morph", UI_COL_TEXT3, &lv_font_montserrat_16);
+    /* kein Rand am Regler: Flex-Grow rechnet ihn nicht mit, die Zeile liefe
+     * sonst rechts ueber (abgeschnittenes "+" beim Tempo) */
+    ui_spacer(mr, 4, 1, false);
     w.morph = ui_slider(mr, 0, 100, kp_rig()->morph);
-    lv_obj_set_style_margin_hor(w.morph, 10, 0);
     lv_obj_add_event_cb(w.morph, morph_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    ui_spacer(mr, 4, 1, false);
     w.morph_val = ui_label(mr, "", UI_COL_TEXT2, &lv_font_montserrat_16);
     lv_obj_set_width(w.morph_val, 56);
 
@@ -382,7 +389,7 @@ lv_obj_t * ui_edit_build(void)
     lv_obj_set_size(minus, 44, 42);
     lv_obj_add_event_cb(minus, bpm_step_cb, LV_EVENT_CLICKED, (void *)(intptr_t)-1);
     lv_obj_t * bpm = ui_button(mr, "", &lv_font_montserrat_18, false);
-    lv_obj_set_size(bpm, 130, 42);
+    lv_obj_set_size(bpm, 120, 42);
     lv_obj_add_event_cb(bpm, tap_cb, LV_EVENT_PRESSED, NULL);
     w.bpm = lv_obj_get_child(bpm, 0);
     lv_obj_t * plus = ui_icon_button(mr, LV_SYMBOL_PLUS, false);

@@ -28,6 +28,13 @@
  *   anderes Rig an unbekanntem Platz (der Kemper schickt beim Wechsel per
  *   Footswitch den Namen vor dem Program Change). Ein am Display gewaehltes Rig wird mit
  *   derselben Zuordnung (CC 32 + PC auf MIDI-Kanal 1) am Kemper geladen.
+ *   Beim Verbinden kommt kein Program Change. Bleibt er aus, fragt das Display
+ *   die Bank mit der Bank-Vorauswahl ab (CC 48 = eine Bank vor, CC 49 = wieder
+ *   zurueck, laut MIDI-Dokumentation ohne Rig-Wechsel); der Kemper meldet die
+ *   vorgewaehlte Bank mit CC 47 und, falls dazu gesendet, den Platz mit
+ *   CC 50-54.
+ *
+ * Transpose: Rig-Parameter 04/04, 28..100 (64 = 0 Halbtoene).
  *
  * Effekte:
  *   Slots A, B, C, D, X, MOD, DLY, REV liegen auf den Seiten 32, 33, 34, 35,
@@ -93,6 +100,8 @@
 #define PAGE_RIG               0x04U
 #define RIG_TEMPO              0x00U
 #define RIG_TEMPO_ENABLE       0x02U
+#define RIG_TRANSPOSE          0x04U
+#define TRANSPOSE_ZERO         64U
 #define PAGE_SENSE             0x7FU
 #define FX_TYPE                0x00U   /* Nummern auf den Seiten der Effekt-Slots */
 #define FX_ON                  0x03U
@@ -102,6 +111,11 @@ static const uint8_t SLOT_PAGE[KL_SLOTS] = { 0x32, 0x33, 0x34, 0x35, 0x38, 0x3A,
 
 #define MIDI_CH                0x00U   /* Kanal 1 fuer Program Change an den Kemper */
 #define CC_BANK_LSB            32U
+#define CC_BANK_PRESELECT      47U     /* Antwort: vorgewaehlte Bank */
+#define CC_BANK_UP             48U
+#define CC_BANK_DOWN           49U
+#define CC_SLOT_FIRST          50U     /* CC 50-54: Platz 1-5 */
+#define POS_PROBE_DELAY_MS     1000U   /* so lange auf einen Program Change warten */
 #define LOAD_NONE              0xFFFFU
 
 
@@ -123,6 +137,7 @@ static uint32_t  t_last_init, t_last_beacon, t_last_poll, t_last_rig_poll;
 static uint8_t   name_pending, name_skip;
 static uint32_t  t_name_req;
 static uint8_t   bank_lsb;           /* zuletzt empfangenes CC 32 */
+static bool      pos_probed;         /* Bank-Abfrage nach dem Verbinden gesendet */
 
 /* Rig-Wahl am Display (LVGL-Task -> Link-Task): Rig-Nummer oder LOAD_NONE */
 static volatile uint16_t load_req = LOAD_NONE;
@@ -140,8 +155,6 @@ static uint16_t          watch_for_type;     /* Typ, fuer den die Liste gilt */
 static bool              watch_typed;        /* Liste mit bekanntem Typ aufgebaut */
 static uint8_t           watch_page;
 static uint8_t           watch_nr[KL_WATCH_MAX];
-static uint16_t          watch_raw[KL_WATCH_MAX];
-static uint16_t          watch_raw_valid;
 static uint32_t          t_last_fx_poll, t_last_watch;
 
 /* Sendewarteschlange fuer SysEx-Nachrichten */
@@ -191,14 +204,16 @@ static void clear_kemper_data(void)
     w.rig_name[0] = w.amp_name[0] = w.cab_name[0] = '\0';
     w.tempo_valid = false;
     w.identity_valid = false;
-    w.rig_pos_valid = false;
+    w.rig_pos_valid = w.rig_bank_valid = false;
+    w.transpose_valid = false;
+    pos_probed = false;
     bank_lsb = 0;
     name_pending = name_skip = 0;
     w.slot_type_valid = w.slot_on_valid = w.slot_on = 0;
     memset(w.slot_name, 0, sizeof(w.slot_name));
     w.fixed_valid = w.fixed_on = 0;
     w.watch_valid = 0;
-    watch_raw_valid = 0;
+    w.watch_raw_valid = 0;
     set_tail = set_head;                 /* offene Aenderungen verwerfen */
     changed();
 }
@@ -301,6 +316,7 @@ static void request_rig_details(void)
     request_string(PAGE_STRINGS, STR_CAB_NAME);
     request_param(PAGE_RIG, RIG_TEMPO);
     request_param(PAGE_RIG, RIG_TEMPO_ENABLE);
+    request_param(PAGE_RIG, RIG_TRANSPOSE);
 }
 
 /* Program Change (+ CC 32) an den Kemper: Rig an Bank/Platz laden */
@@ -319,6 +335,16 @@ static void request_poll(void)
     request_string(PAGE_STRINGS, STR_CAB_NAME);
     request_param(PAGE_RIG, RIG_TEMPO);
     request_param(PAGE_RIG, RIG_TEMPO_ENABLE);
+    request_param(PAGE_RIG, RIG_TRANSPOSE);
+}
+
+/* Bank des geladenen Rigs erfragen (siehe oben): eine Bank vor und zurueck */
+static void send_pos_probe(void)
+{
+    const uint8_t up[]   = { (uint8_t)(0xB0U | MIDI_CH), CC_BANK_UP, 0x00 };
+    const uint8_t down[] = { (uint8_t)(0xB0U | MIDI_CH), CC_BANK_DOWN, 0x00 };
+    (void)txq_push_raw(up, sizeof(up));
+    (void)txq_push_raw(down, sizeof(down));
 }
 
 /* SysEx in USB-MIDI-Events (Kabel 0) zerlegen */
@@ -367,10 +393,11 @@ static void rig_switched(void)
 {
     w.amp_name[0] = w.cab_name[0] = '\0';
     w.tempo_valid = false;
+    w.transpose_valid = false;
     w.slot_type_valid = w.slot_on_valid = 0;
     memset(w.slot_name, 0, sizeof(w.slot_name));
     w.watch_valid = 0;
-    watch_raw_valid = 0;
+    w.watch_raw_valid = 0;
     w.rig_seq++;
     changed();
     request_rig_details();
@@ -384,7 +411,7 @@ static void rig_moved(uint16_t idx, uint32_t now)
     if (idx >= KP_BANKS_MAX * KP_RIGS_PER_BANK) return;
     w.rig_bank = (uint8_t)(idx / KP_RIGS_PER_BANK);
     w.rig_slot = (uint8_t)(idx % KP_RIGS_PER_BANK);
-    w.rig_pos_valid = true;
+    w.rig_pos_valid = w.rig_bank_valid = true;
     w.rig_name[0] = '\0';                /* Name gehoert zum alten Rig */
     name_skip = name_pending;            /* noch offene Antworten verwerfen */
     t_last_rig_poll = now;
@@ -471,10 +498,11 @@ static void watch_setup(void)
     for (uint8_t k = 0; k < n; k++) {
         watch_nr[k] = list[k].nr;
         w.watch_name[k] = list[k].name;
+        w.watch_steps[k] = list[k].steps;
     }
     w.watch_n = n;
     w.watch_valid = 0;
-    watch_raw_valid = 0;
+    w.watch_raw_valid = 0;
     t_last_watch = HAL_GetTick() - WATCH_POLL_MS;      /* sofort lesen */
     changed();
 }
@@ -525,9 +553,10 @@ static void on_value(uint8_t page, uint8_t nr, uint16_t v)
     const int8_t k = watch_index(page, nr);
     if (k >= 0) {
         const uint16_t bit = (uint16_t)(1U << k);
-        if (!(watch_raw_valid & bit) || watch_raw[k] != v || !(w.watch_valid & bit)) {
-            watch_raw[k] = v;
-            watch_raw_valid |= bit;
+        if (!(w.watch_raw_valid & bit) || w.watch_raw[k] != v || !(w.watch_valid & bit)) {
+            w.watch_raw[k] = v;
+            w.watch_raw_valid |= bit;
+            changed();
             request_render(page, nr, v);
         }
     }
@@ -553,7 +582,7 @@ static void on_render(const uint8_t * d, uint16_t n)
         }
     }
     const int8_t k = watch_index(page, nr);
-    if (k >= 0 && (watch_raw_valid & (1U << k)) && watch_raw[k] == v) {
+    if (k >= 0 && (w.watch_raw_valid & (1U << k)) && w.watch_raw[k] == v) {
         char * dst = w.watch_txt[k];
         if (!(w.watch_valid & (1U << k)) || strncmp(dst, tmp, KL_VAL_LEN - 1U) != 0) {
             strncpy(dst, tmp, KL_VAL_LEN - 1U);
@@ -584,6 +613,7 @@ static void process_sets(void)
             for (uint8_t f = 0; f < KL_FIXED; f++)
                 if (kp_fixed_nr((kp_fixed_t)f) == nr) w.fixed_valid &= (uint8_t)~(1U << f);
         }
+        if (page == PAGE_RIG && nr == RIG_TRANSPOSE) w.transpose_valid = false;
         changed();
     }
 }
@@ -612,7 +642,7 @@ static void handle_sysex(const uint8_t * d, uint16_t n)
                 const bool was_empty = w.rig_name[0] == '\0';
                 if (set_str(w.rig_name, tmp) && !was_empty) {
                     /* Anderes Rig am Kemper; wo es liegt, sagt erst der PC */
-                    w.rig_pos_valid = false;
+                    w.rig_pos_valid = w.rig_bank_valid = false;
                     rig_switched();
                 }
             }
@@ -636,6 +666,13 @@ static void handle_sysex(const uint8_t * d, uint16_t n)
             bool on = v != 0U;
             if (on != w.tempo_on) {
                 w.tempo_on = on;
+                changed();
+            }
+        } else if (nr == RIG_TRANSPOSE) {
+            int8_t t = (int8_t)((int16_t)v - (int16_t)TRANSPOSE_ZERO);
+            if (!w.transpose_valid || t != w.transpose) {
+                w.transpose = t;
+                w.transpose_valid = true;
                 changed();
             }
         }
@@ -672,7 +709,23 @@ static void midi_receive(const uint8_t * ev, uint16_t len)
         case 0x7: sx_add(ev[i + 1U]); sx_add(ev[i + 2U]); sx_add(ev[i + 3U]); break;
         case 0xB:                        /* Control Change */
             w.rx_messages++;
-            if (ev[i + 2U] == CC_BANK_LSB) bank_lsb = ev[i + 3U] & 0x7FU;
+            if (ev[i + 2U] == CC_BANK_LSB) {
+                bank_lsb = ev[i + 3U] & 0x7FU;
+            } else if (ev[i + 2U] == CC_BANK_PRESELECT && w.kemper == KL_KEMPER_OK) {
+                /* Antwort auf die Bank-Abfrage: die letzte Meldung zaehlt */
+                const uint8_t b = ev[i + 3U] & 0x7FU;
+                if (!w.rig_bank_valid || w.rig_bank != b) {
+                    w.rig_bank = b;
+                    w.rig_bank_valid = true;
+                    w.rig_pos_valid = false;     /* Platz kommt ggf. mit CC 50-54 */
+                    changed();
+                }
+            } else if (ev[i + 2U] >= CC_SLOT_FIRST && ev[i + 2U] < CC_SLOT_FIRST + KP_RIGS_PER_BANK &&
+                       w.rig_bank_valid && w.kemper == KL_KEMPER_OK) {
+                w.rig_slot = (uint8_t)(ev[i + 2U] - CC_SLOT_FIRST);
+                w.rig_pos_valid = true;
+                changed();
+            }
             break;
         case 0xC:                        /* Program Change: Kemper hat Rig gewechselt */
             w.rx_messages++;
@@ -749,6 +802,10 @@ static void link_step(uint32_t now)
                 load_req = LOAD_NONE;
                 send_load_rig(req);
                 rig_moved(req, now);
+            }
+            if (!pos_probed && !w.rig_bank_valid && now - w.connected_since_ms >= POS_PROBE_DELAY_MS) {
+                pos_probed = true;               /* einmal je Verbindung */
+                send_pos_probe();
             }
             if (now - t_last_poll >= POLL_PERIOD_MS) {
                 t_last_poll = now;
@@ -897,6 +954,17 @@ void kp_link_fixed(kp_fixed_t f, bool on)
     if (f < KL_FIXED && kp_connected()) set_push(KP_FIXED_PAGE, kp_fixed_nr(f), on ? 1U : 0U);
 }
 
+void kemper_link_set_param(uint8_t page, uint8_t nr, uint16_t value)
+{
+    if (kp_connected()) set_push(page, nr, value > 16383U ? 16383U : value);
+}
+
+void kp_link_param(kp_param_t p, int16_t value)
+{
+    if (p == KP_P_RIG_TRANSPOSE && kp_connected())
+        set_push(PAGE_RIG, RIG_TRANSPOSE, (uint16_t)(value + (int16_t)TRANSPOSE_ZERO));
+}
+
 /* Rig-Wahl am Display: der Link-Task schickt sie an den Kemper
  * (ersetzt die schwache Fassung in kemper_player.c) */
 void kp_link_load_rig(uint8_t bank, uint8_t slot)
@@ -914,6 +982,8 @@ void kemper_link_ui_poll(void)
     static char      amp[KL_STR_LEN], cab[KL_STR_LEN];
     static bool      tempo_valid, tempo_on;
     static uint16_t  tempo_bpm;
+    static bool      transpose_valid;
+    static int8_t    transpose;
     /* zuletzt ans Modell gemeldete Effektdaten */
     static uint8_t   fx_type_ok, fx_on_ok, fx_on, fix_ok, fix_on;
     static uint16_t  fx_type[KL_SLOTS];
@@ -935,10 +1005,11 @@ void kemper_link_ui_poll(void)
         rig_seq = i.rig_seq;
         rig[0] = amp[0] = cab[0] = '\0';
         tempo_valid = false;
+        transpose_valid = false;
         fx_type_ok = fx_on_ok = fix_ok = 0;
         memset(fx_name, 0, sizeof(fx_name));
         /* Kemper hat an bekannter Stelle ein anderes Rig geladen */
-        if (conn && i.rig_pos_valid && (i.rig_bank != kp_bank() || i.rig_slot != kp_slot()))
+        if (conn && i.rig_pos_valid && (!kp_slot_known() || i.rig_bank != kp_bank() || i.rig_slot != kp_slot()))
             kp_rx_rig_loaded(i.rig_bank, i.rig_slot);
     }
     if (!conn) {
@@ -955,6 +1026,15 @@ void kemper_link_ui_poll(void)
             kp_rx_rig_changed(rig);      /* Platz unbekannt: nur das Rig selbst */
         amp[0] = cab[0] = '\0';         /* Modell hat die Details geleert */
         tempo_valid = false;
+        transpose_valid = false;
+    }
+
+    /* Position des geladenen Rigs nachtraeglich bekannt (Bank-Abfrage) */
+    if (i.rig_pos_valid) {
+        if (!kp_slot_known() || i.rig_bank != kp_bank() || i.rig_slot != kp_slot())
+            kp_rx_rig_position(i.rig_bank, i.rig_slot);
+    } else if (i.rig_bank_valid && (!kp_bank_known() || i.rig_bank != kp_bank())) {
+        kp_rx_bank(i.rig_bank);
     }
 
     if ((i.amp_name[0] || i.cab_name[0]) &&
@@ -968,6 +1048,11 @@ void kemper_link_ui_poll(void)
         tempo_bpm = i.tempo_bpm;
         tempo_on = i.tempo_on;
         kp_rx_tempo(tempo_on, tempo_bpm);
+    }
+    if (i.transpose_valid && (!transpose_valid || i.transpose != transpose)) {
+        transpose_valid = true;
+        transpose = i.transpose;
+        kp_rx_param(KP_P_RIG_TRANSPOSE, transpose);
     }
 
     /* Effekt-Slots: nur gemeldete (gueltige) Werte uebernehmen. Ein ungueltiger

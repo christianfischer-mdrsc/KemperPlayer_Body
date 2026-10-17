@@ -192,7 +192,9 @@ static const kp_fx_param_t FIXP_TRANSPOSE[] = { {  2, "Pitch" } };
 static const kp_fx_param_t FIXP_GATE[]      = { {  7, "Threshold" }, {  8, "Decay" } };
 static const kp_fx_param_t FIXP_COMP[]      = { { 12, "Threshold" } };
 static const kp_fx_param_t FIXP_BOOST[]     = { { 17, "Volume" } };
-static const kp_fx_param_t FIXP_WAH[]       = { { 22, "Wah Mode" } };
+/* Wah Mode: Auswahl wie "Pedal Mode" der Wah-Effekte (Off, Touch, On,
+ * Bypass @ Stop/Heel/Toe), Anzahl nicht dokumentiert */
+static const kp_fx_param_t FIXP_WAH[]       = { { 22, "Wah Mode", 6 } };
 static const kp_fx_param_t FIXP_CHORUS[]    = { { 27, "Rate" }, { 28, "Depth" }, { 29, "Mix" } };
 static const kp_fx_param_t FIXP_AIR[]       = { { 37, "Depth" }, { 38, "Mix" } };
 static const kp_fx_param_t FIXP_DOUBLE[]    = { { 42, "Looseness" }, { 43, "Stereo" } };
@@ -238,7 +240,7 @@ static const char * const BANK_COLOR_NAME[5] = { "Blau", "Gelb", "Rot", "Gruen",
 static const kp_param_info_t PARAMS[KP_P_COUNT] = {
     [KP_P_RIG_VOLUME]     = { "Rig Volume",     KP_SEC_RIG,    KP_FMT_SIGNED_TENTH, -50,  50,   0 },
     [KP_P_RIG_PAN]        = { "Panorama",       KP_SEC_RIG,    KP_FMT_PAN,          -50,  50,   0 },
-    [KP_P_RIG_TRANSPOSE]  = { "Transpose",      KP_SEC_RIG,    KP_FMT_SEMI,         -12,  12,   0 },
+    [KP_P_RIG_TRANSPOSE]  = { "Transpose",      KP_SEC_RIG,    KP_FMT_SEMI,         -36,  36,   0 },
     [KP_P_CLEAN_SENS]     = { "Clean Sens",     KP_SEC_INPUT,  KP_FMT_DB,           -12,  12,   0 },
     [KP_P_NOISE_GATE]     = { "Noise Gate",     KP_SEC_INPUT,  KP_FMT_TENTH,          0, 100,   0 },
     [KP_P_GAIN]           = { "Gain",           KP_SEC_AMP,    KP_FMT_TENTH,          0, 100,  50 },
@@ -268,6 +270,8 @@ static struct {
     kp_level_t    level;
     bool          connected;
     uint8_t       bank, slot;
+    bool          bank_known, slot_known;
+    kp_fs_assign_t fs_assign[KP_FOOTSWITCHES];
     kp_rig_t      rig;
     int16_t       global[KP_P_COUNT];    /* Output-Parameter */
     kp_fs_mode_t  fs_mode;
@@ -343,6 +347,11 @@ void kp_init(void)
     memset(s_names, 0, sizeof(s_names));
     s.level = KP_LEVEL_1;
     s.fs_mode = KP_FS_MODE_FX;      /* unten stehen die Effect Buttons, nicht die Rigs */
+    s.bank_known = s.slot_known = true;
+    for (uint8_t i = 0; i < KP_FX_BUTTONS; i++)
+        s.fs_assign[i] = (kp_fs_assign_t){ KP_FSA_FX_BUTTON, i };
+    s.fs_assign[4] = (kp_fs_assign_t){ KP_FSA_TAP, 0 };
+    s.fs_assign[5] = (kp_fs_assign_t){ KP_FSA_NONE, 0 };
     rig_clear(&s.rig);
     for (int i = 0; i < KP_P_COUNT; i++) s.global[i] = PARAMS[i].def;
     s.tuner_ref = 440;
@@ -487,6 +496,8 @@ uint32_t kp_cat_color(kp_cat_t c)     { return CAT_COLOR[c < KP_CAT_COUNT ? c : 
  * --------------------------------------------------------------------- */
 uint8_t kp_bank(void) { return s.bank; }
 uint8_t kp_slot(void) { return s.slot; }
+bool kp_bank_known(void) { return s.bank_known; }
+bool kp_slot_known(void) { return s.slot_known; }
 
 const char * kp_rig_name_at(uint8_t bank, uint8_t slot)
 {
@@ -502,6 +513,7 @@ void kp_select_rig(uint8_t bank, uint8_t slot)
     if (bank >= kp_bank_count() || slot >= KP_RIGS_PER_BANK) return;
     s.bank = bank;
     s.slot = slot;
+    s.bank_known = s.slot_known = true;
     /* Wie am Kemper: nicht gespeicherte Aenderungen gehen verloren. Die
      * Details des neuen Rigs liefert der Kemper (kp_rx_*). */
     rig_clear(&s.rig);
@@ -613,6 +625,7 @@ void kp_fx_button_press(uint8_t btn)
     for (int m = 0; m < KP_MOD_COUNT; m++) {
         if ((s.rig.fx_btn[btn] & (1u << m)) && s.rig.mod[m].type) {
             s.rig.mod[m].on = !s.rig.mod[m].on;
+            kp_link_module_on((kp_mod_t)m, s.rig.mod[m].on);
         }
     }
     mark_edited();
@@ -785,44 +798,102 @@ void kp_fs_set_mode(kp_fs_mode_t mode)
     notify(KP_CHG_SYSTEM);
 }
 
+kp_fs_assign_t kp_fs_assign(uint8_t idx)
+{
+    if (idx >= KP_FOOTSWITCHES) return (kp_fs_assign_t){ KP_FSA_NONE, 0 };
+    return s.fs_assign[idx];
+}
+
+void kp_fs_set_assign(uint8_t idx, kp_fs_assign_t a)
+{
+    if (idx >= KP_FOOTSWITCHES) return;
+    s.fs_assign[idx] = a;
+    notify(KP_CHG_SYSTEM);
+}
+
+const char * kp_fs_assign_name(kp_fs_assign_t a)
+{
+    static const char * const BTN[KP_FX_BUTTONS] = {
+        "Effect Button I", "Effect Button II", "Effect Button III", "Effect Button IIII"
+    };
+    static char mod[12];
+    switch (a.kind) {
+    case KP_FSA_FX_BUTTON: return a.idx < KP_FX_BUTTONS ? BTN[a.idx] : "";
+    case KP_FSA_MODULE:
+        snprintf(mod, sizeof(mod), "Modul %s", kp_module_name((kp_mod_t)a.idx));
+        return mod;
+    case KP_FSA_FIXED:     return kp_fixed_name((kp_fixed_t)a.idx);
+    case KP_FSA_TAP:       return "Tap Tempo";
+    default:               return "nicht belegt";
+    }
+}
+
 void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
 {
     memset(o, 0, sizeof(*o));
     snprintf(o->top, sizeof(o->top), "FS%u", (unsigned)(idx + 1));
     if (idx >= KP_FOOTSWITCHES) return;
+    const kp_fs_assign_t a = s.fs_assign[idx];
 
-    {
-        if (idx < KP_FX_BUTTONS) {
-            uint8_t mask = s.rig.fx_btn[idx];
-            char buf[KP_NAME_LEN] = "";
-            uint32_t col = 0;
-            for (int m = 0; m < KP_MOD_COUNT; m++) {
-                if (!(mask & (1u << m))) continue;
-                if (buf[0]) strncat(buf, " + ", sizeof(buf) - strlen(buf) - 1);
-                strncat(buf, MOD_NAME[m], sizeof(buf) - strlen(buf) - 1);
-                if (!col && s.rig.mod[m].type) col = CAT_COLOR[kp_effect_cat(s.rig.mod[m].type)];
-            }
-            copy_name(o->main, buf[0] ? buf : "nicht belegt");
-            o->empty = mask == 0;
-            snprintf(o->sub, sizeof(o->sub), "Effect Button %s", FX_BTN_NAME[idx]);
-            o->active = kp_fx_button_state(idx);
-            o->led = o->active ? col : 0;
-        } else if (idx == 4) {
-            copy_name(o->main, "TAP");
-            if (s.rig.tempo_on) snprintf(o->sub, sizeof(o->sub), "%u BPM", s.rig.tempo_bpm);
-            else                snprintf(o->sub, sizeof(o->sub), "Tempo aus");
-        } else {
-            o->empty = true;             /* FS6: nicht belegt */
-            copy_name(o->main, "-");
+    switch (a.kind) {
+    case KP_FSA_FX_BUTTON: {
+        uint8_t mask = s.rig.fx_btn[a.idx];
+        char buf[KP_NAME_LEN] = "";
+        uint32_t col = 0;
+        for (int m = 0; m < KP_MOD_COUNT; m++) {
+            if (!(mask & (1u << m))) continue;
+            if (buf[0]) strncat(buf, " + ", sizeof(buf) - strlen(buf) - 1);
+            strncat(buf, MOD_NAME[m], sizeof(buf) - strlen(buf) - 1);
+            if (!col && s.rig.mod[m].type) col = CAT_COLOR[kp_effect_cat(s.rig.mod[m].type)];
         }
+        copy_name(o->main, buf[0] ? buf : "nicht belegt");
+        o->empty = mask == 0;
+        snprintf(o->sub, sizeof(o->sub), "Effect Button %s", FX_BTN_NAME[a.idx]);
+        o->active = kp_fx_button_state(a.idx);
+        o->led = o->active ? col : 0;
+        break;
+    }
+    case KP_FSA_MODULE: {
+        const kp_module_t * m = &s.rig.mod[a.idx];
+        const bool avail = kp_module_available((kp_mod_t)a.idx);
+        copy_name(o->main, avail && m->type ? kp_module_fx_name((kp_mod_t)a.idx) : "leer");
+        snprintf(o->sub, sizeof(o->sub), "Modul %s", MOD_NAME[a.idx]);
+        o->empty = !avail || !m->type;
+        o->active = !o->empty && m->on;
+        o->led = o->active ? CAT_COLOR[kp_effect_cat(m->type)] : 0;
+        break;
+    }
+    case KP_FSA_FIXED:
+        copy_name(o->main, FIX_NAME[a.idx]);
+        snprintf(o->sub, sizeof(o->sub), "%s", s.fixed[a.idx] < 0 ? "Fixed Effect" :
+                 (s.fixed[a.idx] ? "Fixed Effect: an" : "Fixed Effect: aus"));
+        o->active = s.fixed[a.idx] == 1;
+        o->led = o->active ? CAT_COLOR[FIX_CAT[a.idx]] : 0;
+        break;
+    case KP_FSA_TAP:
+        copy_name(o->main, "TAP");
+        if (s.rig.tempo_on) snprintf(o->sub, sizeof(o->sub), "%u BPM", s.rig.tempo_bpm);
+        else                snprintf(o->sub, sizeof(o->sub), "Tempo aus");
+        break;
+    default:
+        o->empty = true;
+        copy_name(o->main, "-");
+        snprintf(o->sub, sizeof(o->sub), "nicht belegt");
+        break;
     }
 }
 
 void kp_footswitch(uint8_t idx, uint32_t now_ms)
 {
     if (idx >= KP_FOOTSWITCHES) return;
-    if (idx < KP_FX_BUTTONS)  kp_fx_button_press(idx);
-    else if (idx == 4)        kp_tap(now_ms);
+    const kp_fs_assign_t a = s.fs_assign[idx];
+    switch (a.kind) {
+    case KP_FSA_FX_BUTTON: kp_fx_button_press(a.idx);             break;
+    case KP_FSA_MODULE:    kp_module_toggle((kp_mod_t)a.idx);     break;
+    case KP_FSA_FIXED:     kp_fixed_toggle((kp_fixed_t)a.idx);    break;
+    case KP_FSA_TAP:       kp_tap(now_ms);                        break;
+    default:               break;
+    }
 }
 
 /* ------------------------------------------------------------------------
@@ -830,6 +901,12 @@ void kp_footswitch(uint8_t idx, uint32_t now_ms)
  * --------------------------------------------------------------------- */
 void kp_rx_connected(bool connected)
 {
+    if (connected && !s.connected) {
+        /* Wo das Rig am Kemper liegt, meldet er erst noch */
+        s.bank_known = s.slot_known = false;
+        notify(KP_CHG_RIG);
+    }
+    if (!connected) s.bank_known = s.slot_known = true;   /* ohne Kemper gilt das Display */
     s.connected = connected;
     if (!connected) for (int f = 0; f < KP_FIX_COUNT; f++) s.fixed[f] = -1;
     notify(KP_CHG_SYSTEM);
@@ -853,14 +930,34 @@ void kp_rx_rig_loaded(uint8_t bank, uint8_t slot)
     if (bank >= kp_bank_count() || slot >= KP_RIGS_PER_BANK) return;
     s.bank = bank;
     s.slot = slot;
+    s.bank_known = s.slot_known = true;
     rig_clear(&s.rig);
     copy_name(s.rig.name, s_names[bank][slot]);
     notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);
 }
 
+void kp_rx_rig_position(uint8_t bank, uint8_t slot)
+{
+    if (bank >= kp_bank_count() || slot >= KP_RIGS_PER_BANK) return;
+    s.bank = bank;
+    s.slot = slot;
+    s.bank_known = s.slot_known = true;
+    if (s.rig.name[0] && !s.rig.edited) copy_name(s_names[bank][slot], s.rig.name);
+    notify(KP_CHG_RIG | KP_CHG_NAMES);
+}
+
+void kp_rx_bank(uint8_t bank)
+{
+    if (bank >= kp_bank_count()) return;
+    s.bank = bank;
+    s.bank_known = true;
+    notify(KP_CHG_RIG);
+}
+
 void kp_rx_rig_changed(const char * name)
 {
     rig_clear(&s.rig);
+    s.bank_known = s.slot_known = false;
     copy_name(s.rig.name, name);
     s.tap_n = 0;
     notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);

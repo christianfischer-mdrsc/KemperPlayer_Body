@@ -3,10 +3,12 @@
  * Live-Ansicht: grosse, reduzierte Anzeige zum Spielen.
  *
  *  - Bank (antippen = Bank-Uebersicht, Pfeile = Bank wechseln)
- *  - Rig-Name, Amp/Cab
+ *  - Rig-Name (Amp/Cab stehen in der Stack-Kachel)
  *  - Tempo (antippen = Tap Tempo)
- *  - Fixed Effects und Effektkette (antippen = ein/aus, halten = Einstellungen)
- *  - Footswitch-Leiste FS1-FS6 (Rigs bzw. Effect Buttons)
+ *  - Signalpfad: Fixed Effects, Effekt-Module und Stack als Kacheln in der
+ *    Reihenfolge des Signalflusses (antippen = ein/aus, halten = Einstellungen),
+ *    Transpose als kleines Feld am Anfang (halten = Tonhoehe)
+ *  - Footswitch-Leiste FS1-FS6 (halten = Belegung waehlen)
  */
 #include "ui_common.h"
 #include "ui_screens.h"
@@ -20,9 +22,7 @@ static struct {
     lv_obj_t * bpm_led;
     lv_obj_t * slot;
     lv_obj_t * rig;
-    lv_obj_t * stack;
-    ui_chain_t chain;
-    ui_fixed_row_t fixed;
+    ui_path_t  path;
     ui_fsbar_t fs;
 } w;
 
@@ -39,7 +39,8 @@ static void update_rig(void)
 {
     const kp_rig_t * r = kp_rig();
     ui_bank_chip_update(w.bank_lbl, w.bank_dot);
-    lv_label_set_text_fmt(w.slot, "Rig %u", (unsigned)(kp_slot() + 1));
+    if (kp_slot_known()) lv_label_set_text_fmt(w.slot, "Rig %u", (unsigned)(kp_slot() + 1));
+    else                 lv_label_set_text(w.slot, "Rig ?");
 
     if (r->name[0]) {
         lv_label_set_text(w.rig, r->name);
@@ -47,14 +48,6 @@ static void update_rig(void)
     } else {
         lv_label_set_text(w.rig, "Leeres Rig");
         lv_obj_set_style_text_color(w.rig, lv_color_hex(UI_COL_TEXT3), 0);
-    }
-
-    if (r->amp[0]) {
-        lv_label_set_text_fmt(w.stack, "Amp: %s   /   Cab: %s", r->amp, r->cab[0] ? r->cab : "-");
-    } else if (!kp_connected()) {
-        lv_label_set_text(w.stack, "Rig-Daten kommen vom Kemper Player, sobald er verbunden ist");
-    } else {
-        lv_label_set_text(w.stack, "");
     }
 
     if (r->edited) lv_obj_set_hidden(w.edited, false);
@@ -65,8 +58,8 @@ static void refresh(uint32_t chg)
 {
     if (chg & (KP_CHG_RIG | KP_CHG_SYSTEM | KP_CHG_NAMES)) update_rig();
     if (chg & (KP_CHG_TEMPO | KP_CHG_RIG))  update_tempo();
-    if (chg & (KP_CHG_MODULES | KP_CHG_RIG)) ui_chain_update(&w.chain);
-    if (chg & (KP_CHG_FIXED | KP_CHG_SYSTEM)) ui_fixed_update(&w.fixed);
+    if (chg & (KP_CHG_MODULES | KP_CHG_RIG | KP_CHG_FIXED | KP_CHG_PARAMS | KP_CHG_SYSTEM))
+        ui_path_update(&w.path);
     ui_fsbar_update(&w.fs);
 }
 
@@ -77,18 +70,6 @@ static void bank_next_cb(lv_event_t * e) { (void)e; kp_bank_step(+1); }
 static void home_cb(lv_event_t * e)    { (void)e; ui_nav_go(UI_SCR_HOME); }
 static void edit_cb(lv_event_t * e)    { (void)e; ui_nav_go(UI_SCR_EDIT); }
 static void tap_cb(lv_event_t * e)     { (void)e; kp_tap(lv_tick_get()); }
-
-static void tile_cb(lv_event_t * e)
-{
-    uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
-    if (w.chain.id[i] != KP_CHAIN_STACK) kp_module_toggle((kp_mod_t)w.chain.id[i]);
-}
-
-static void tile_long_cb(lv_event_t * e)
-{
-    uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
-    if (w.chain.id[i] != KP_CHAIN_STACK) ui_fx_dialog((kp_mod_t)w.chain.id[i]);
-}
 
 /* ---- Aufbau ----------------------------------------------------------- */
 lv_obj_t * ui_live_build(void)
@@ -138,14 +119,10 @@ lv_obj_t * ui_live_build(void)
     lv_obj_set_size(w.rig, LV_PCT(100), 60);
     lv_obj_set_style_pad_left(w.rig, 12, 0);
     lv_label_set_long_mode(w.rig, LV_LABEL_LONG_DOT);
-    w.stack = ui_label(body, "", UI_COL_TEXT2, &lv_font_montserrat_18);
-    lv_obj_set_style_pad_left(w.stack, 12, 0);
 
     ui_spacer(body, LV_PCT(100), 1, true);
-
-    ui_fixed_create(&w.fixed, body);
-    ui_chain_create(&w.chain, body, false, tile_cb, tile_long_cb);
-    ui_spacer(body, LV_PCT(100), 8, false);
+    ui_path_create(&w.path, body, 112);
+    ui_spacer(body, LV_PCT(100), 1, true);
     ui_fsbar_create(&w.fs, body);
 
     update_rig();
