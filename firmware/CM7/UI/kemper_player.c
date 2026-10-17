@@ -18,45 +18,193 @@
 static char s_names[KP_BANKS_MAX][KP_RIGS_PER_BANK][KP_NAME_LEN] KP_D3_BSS;
 
 /* ------------------------------------------------------------------------
- * Effektkatalog (Level I des Players, Namen wie im Kemper).
- * Level II/III haben weitere Typen; die liefert spaeter der Kemper.
+ * Effektkatalog mit den Typnummern des Kemper (MIDI-Parameter "Type").
+ * basic = Auswahl schon bei Level I/II (wie bisher); Level III bietet alle.
+ * Den Namen eines geladenen Effekts liefert ohnehin der Kemper selbst.
  * --------------------------------------------------------------------- */
+#define B true
+#define _ false
 static const kp_effect_t EFFECTS[] = {
-    { "Leer",               KP_CAT_NONE   },
-    { "Wah Wah",            KP_CAT_WAH    },
-    { "Green Scream",       KP_CAT_DIST   },
-    { "Plus DS",            KP_CAT_DIST   },
-    { "One DS",             KP_CAT_DIST   },
-    { "Muffin",             KP_CAT_DIST   },
-    { "Pure Booster",       KP_CAT_BOOST  },
-    { "Graphic Equalizer",  KP_CAT_EQ     },
-    { "Acoustic Simulator", KP_CAT_EQ     },
-    { "Double Tracker",     KP_CAT_EQ     },
-    { "Compressor",         KP_CAT_COMP   },
-    { "Noise Gate 2:1",     KP_CAT_GATE   },
-    { "Noise Gate 4:1",     KP_CAT_GATE   },
-    { "Vintage Chorus",     KP_CAT_CHORUS },
-    { "Air Chorus",         KP_CAT_CHORUS },
-    { "Vibrato",            KP_CAT_CHORUS },
-    { "Rotary Speaker",     KP_CAT_CHORUS },
-    { "Tremolo",            KP_CAT_CHORUS },
-    { "Phaser",             KP_CAT_PHASER },
-    { "Flanger",            KP_CAT_PHASER },
-    { "Transpose",          KP_CAT_PITCH  },
-    { "Analog Octaver",     KP_CAT_PITCH  },
-    { "Single Delay",       KP_CAT_DELAY  },
-    { "Two Tap Delay",      KP_CAT_DELAY  },
-    { "Legacy Delay",       KP_CAT_DELAY  },
-    { "Spring Reverb",      KP_CAT_REVERB },
-    { "Easy Reverb",        KP_CAT_REVERB },
-    { "Echo Reverb",        KP_CAT_REVERB },
-    { "Legacy Reverb",      KP_CAT_REVERB },
+    {   0, "Leer",                    KP_CAT_NONE,   B },
+    {   1, "Wah Wah",                 KP_CAT_WAH,    B },
+    {   2, "Wah Low Pass",            KP_CAT_WAH,    _ },
+    {   3, "Wah High Pass",           KP_CAT_WAH,    _ },
+    {   4, "Wah Vowel Filter",        KP_CAT_WAH,    _ },
+    {   6, "Wah Phaser",              KP_CAT_WAH,    _ },
+    {   7, "Wah Flanger",             KP_CAT_WAH,    _ },
+    {   8, "Wah Rate Reducer",        KP_CAT_WAH,    _ },
+    {   9, "Wah Ring Modulator",      KP_CAT_WAH,    _ },
+    {  10, "Wah Frequency Shifter",   KP_CAT_WAH,    _ },
+    {  11, "Pitch Pedal",             KP_CAT_PITCH,  _ },
+    {  12, "Wah Formant Shift",       KP_CAT_WAH,    _ },
+    {  13, "Pedal Vinyl Stop",        KP_CAT_WAH,    _ },
+    {  17, "Bit Shaper",              KP_CAT_DIST,   _ },
+    {  18, "Octa Shaper",             KP_CAT_DIST,   _ },
+    {  19, "Soft Shaper",             KP_CAT_DIST,   _ },
+    {  20, "Hard Shaper",             KP_CAT_DIST,   _ },
+    {  21, "Wave Shaper",             KP_CAT_DIST,   _ },
+    {  32, "Kemper Drive",            KP_CAT_DIST,   _ },
+    {  33, "Green Scream",            KP_CAT_DIST,   B },
+    {  34, "Plus DS",                 KP_CAT_DIST,   B },
+    {  35, "One DS",                  KP_CAT_DIST,   B },
+    {  36, "Muffin",                  KP_CAT_DIST,   B },
+    {  37, "Mouse",                   KP_CAT_DIST,   _ },
+    {  38, "Kemper Fuzz",             KP_CAT_DIST,   _ },
+    {  39, "Metal DS",                KP_CAT_DIST,   _ },
+    {  42, "Full OC",                 KP_CAT_DIST,   _ },
+    {  49, "Compressor",              KP_CAT_COMP,   B },
+    {  50, "Auto Swell",              KP_CAT_COMP,   _ },
+    {  57, "Noise Gate 2:1",          KP_CAT_GATE,   B },
+    {  58, "Noise Gate 4:1",          KP_CAT_GATE,   B },
+    {  64, "Space",                   KP_CAT_CHORUS, _ },
+    {  65, "Vintage Chorus",          KP_CAT_CHORUS, B },
+    {  66, "Hyper Chorus",            KP_CAT_CHORUS, _ },
+    {  67, "Air Chorus",              KP_CAT_CHORUS, B },
+    {  68, "Vibrato",                 KP_CAT_CHORUS, B },
+    {  69, "Rotary Speaker",          KP_CAT_CHORUS, B },
+    {  70, "Tube Bias Tremolo",       KP_CAT_CHORUS, B },
+    {  71, "Micro Pitch",             KP_CAT_CHORUS, _ },
+    {  75, "Photocell Tremolo",       KP_CAT_CHORUS, _ },
+    {  76, "Harmonic Tremolo",        KP_CAT_CHORUS, _ },
+    {  77, "Pulse Slicer",            KP_CAT_CHORUS, _ },
+    {  78, "Saw Slicer",              KP_CAT_CHORUS, _ },
+    {  79, "Pulse Autopanner",        KP_CAT_CHORUS, _ },
+    {  80, "Saw Autopanner",          KP_CAT_CHORUS, _ },
+    {  81, "Phaser",                  KP_CAT_PHASER, B },
+    {  82, "Phaser Vibe",             KP_CAT_PHASER, _ },
+    {  83, "Phaser Oneway",           KP_CAT_PHASER, _ },
+    {  89, "Flanger",                 KP_CAT_PHASER, B },
+    {  91, "Flanger Oneway",          KP_CAT_PHASER, _ },
+    {  97, "Graphic Equalizer",       KP_CAT_EQ,     B },
+    {  98, "Studio Equalizer",        KP_CAT_EQ,     _ },
+    {  99, "Metal Equalizer",         KP_CAT_EQ,     _ },
+    { 100, "Acoustic Simulator",      KP_CAT_EQ,     B },
+    { 101, "Stereo Widener",          KP_CAT_EQ,     _ },
+    { 102, "Phase Widener",           KP_CAT_EQ,     _ },
+    { 103, "Delay Widener",           KP_CAT_EQ,     _ },
+    { 104, "Double Tracker",          KP_CAT_EQ,     B },
+    { 113, "Treble Booster",          KP_CAT_BOOST,  _ },
+    { 114, "Lead Booster",            KP_CAT_BOOST,  _ },
+    { 115, "Pure Booster",            KP_CAT_BOOST,  B },
+    { 116, "Wah Pedal Booster",       KP_CAT_BOOST,  _ },
+    { 121, "Loop Mono",               KP_CAT_LOOPER, _ },
+    { 122, "Loop Stereo",             KP_CAT_LOOPER, _ },
+    { 123, "Loop Distortion",         KP_CAT_LOOPER, _ },
+    { 129, "Transpose",               KP_CAT_PITCH,  B },
+    { 130, "Chromatic Pitch",         KP_CAT_PITCH,  _ },
+    { 131, "Harmonic Pitch",          KP_CAT_PITCH,  _ },
+    { 132, "Analog Octaver",          KP_CAT_PITCH,  B },
+    { 137, "Dual Chromatic",          KP_CAT_DELAY,  _ },
+    { 138, "Dual Harmonic",           KP_CAT_DELAY,  _ },
+    { 139, "Dual Crystal",            KP_CAT_DELAY,  _ },
+    { 140, "Dual Loop Pitch",         KP_CAT_DELAY,  _ },
+    { 145, "Legacy Delay",            KP_CAT_DELAY,  B },
+    { 146, "Single Delay",            KP_CAT_DELAY,  B },
+    { 147, "Dual Delay",              KP_CAT_DELAY,  _ },
+    { 148, "Two Tap Delay",           KP_CAT_DELAY,  B },
+    { 149, "Serial Two Tap Delay",    KP_CAT_DELAY,  _ },
+    { 150, "Crystal Delay",           KP_CAT_DELAY,  _ },
+    { 151, "Loop Pitch Delay",        KP_CAT_DELAY,  _ },
+    { 152, "Frequency Shifter Delay", KP_CAT_DELAY,  _ },
+    { 161, "Rhythm Delay",            KP_CAT_DELAY,  _ },
+    { 162, "Melody Chromatic",        KP_CAT_DELAY,  _ },
+    { 163, "Melody Harmonic",         KP_CAT_DELAY,  _ },
+    { 164, "Quad Delay",              KP_CAT_DELAY,  _ },
+    { 165, "Quad Chromatic",          KP_CAT_DELAY,  _ },
+    { 166, "Quad Harmonic",           KP_CAT_DELAY,  _ },
+    { 177, "Legacy Reverb",           KP_CAT_REVERB, B },
+    { 178, "Natural Reverb",          KP_CAT_REVERB, _ },
+    { 179, "Easy Reverb",             KP_CAT_REVERB, B },
+    { 180, "Echo Reverb",             KP_CAT_REVERB, B },
+    { 181, "Cirrus Reverb",           KP_CAT_REVERB, _ },
+    { 182, "Formant Reverb",          KP_CAT_REVERB, _ },
+    { 183, "Ionosphere Reverb",       KP_CAT_REVERB, _ },
+    { 193, "Spring Reverb",           KP_CAT_REVERB, B },
 };
+#undef B
+#undef _
 #define EFFECT_COUNT ((uint8_t)(sizeof(EFFECTS) / sizeof(EFFECTS[0])))
+
+/* ------------------------------------------------------------------------
+ * Einstellungen je Effektart (NRPN-Nummern der Stomp-Seiten laut Kemper
+ * "MIDI Parameter Documentation"; Delay/Reverb-Mix laut PySwitch)
+ * --------------------------------------------------------------------- */
+#define P_MIX     { 4,  "Mix" }
+#define P_VOLUME  { 6,  "Volume" }
+#define P_DUCKING { 53, "Ducking" }
+static const kp_fx_param_t FXP_WAH[] = {
+    { 8, "Manual" }, { 9, "Peak" }, { 10, "Range" }, { 52, "Peak Range" },
+    { 12, "Pedal Mode" }, { 13, "Touch Attack" }, { 14, "Touch Release" },
+    { 15, "Touch Boost" }, P_MIX, P_VOLUME, P_DUCKING,
+};
+static const kp_fx_param_t FXP_DIST[]  = { { 16, "Drive" }, { 17, "Tone" }, P_MIX, P_VOLUME, P_DUCKING };
+static const kp_fx_param_t FXP_BOOST[] = { P_VOLUME, { 17, "Tone" }, P_MIX, P_DUCKING };
+static const kp_fx_param_t FXP_COMP[]  = {
+    { 18, "Intensity" }, { 19, "Attack" }, { 33, "Squash" }, P_MIX, P_VOLUME, P_DUCKING,
+};
+static const kp_fx_param_t FXP_GATE[]  = { { 18, "Threshold" }, P_MIX, P_VOLUME };
+static const kp_fx_param_t FXP_MOD[]   = {
+    { 20, "Rate" }, { 21, "Depth" }, { 22, "Feedback" }, { 23, "Crossover" },
+    { 24, "Hyper Amount" }, { 25, "Manual" }, { 26, "Peak Spread" }, { 27, "Stages" },
+    P_MIX, P_VOLUME, P_DUCKING,
+};
+static const kp_fx_param_t FXP_ROTARY[] = {
+    { 30, "Speed" }, { 31, "Distance" }, { 32, "Low/High Balance" }, P_MIX, P_VOLUME,
+};
+static const kp_fx_param_t FXP_GEQ[] = {
+    { 34, "80 Hz" }, { 35, "160 Hz" }, { 36, "320 Hz" }, { 37, "640 Hz" },
+    { 38, "1,25 kHz" }, { 39, "2,5 kHz" }, { 40, "5 kHz" }, { 41, "10 kHz" },
+    P_MIX, P_VOLUME,
+};
+static const kp_fx_param_t FXP_SEQ[] = {
+    { 42, "Low Gain" }, { 43, "Low Frequency" }, { 44, "High Gain" }, { 45, "High Frequency" },
+    { 46, "Mid1 Gain" }, { 47, "Mid1 Frequency" }, { 48, "Mid1 Q-Factor" },
+    { 49, "Mid2 Gain" }, { 50, "Mid2 Frequency" }, { 51, "Mid2 Q-Factor" }, P_MIX, P_VOLUME,
+};
+static const kp_fx_param_t FXP_EQ[] = { P_MIX, P_VOLUME, { 7, "Stereo" }, { 67, "Low Cut" }, { 68, "High Cut" } };
+static const kp_fx_param_t FXP_PITCH[] = {
+    { 55, "Voice Mix" }, { 56, "Voice 1 Pitch" }, { 57, "Voice 2 Pitch" }, { 58, "Detune" },
+    { 64, "Key" }, { 60, "Smooth Chords" }, { 61, "Pure Tuning" }, P_MIX, P_VOLUME, P_DUCKING,
+};
+static const kp_fx_param_t FXP_DELAY[] = {
+    { 69, "Mix" }, { 71, "Time" }, { 76, "Note Value" }, { 80, "To Tempo" },
+    { 93, "Feedback" }, { 98, "Low Cut" }, { 99, "High Cut" }, { 101, "Modulation" },
+    { 102, "Chorus" }, P_DUCKING, P_VOLUME,
+};
+static const kp_fx_param_t FXP_REVERB[] = { { 69, "Mix" }, P_VOLUME, P_DUCKING, { 67, "Low Cut" }, { 68, "High Cut" } };
+static const kp_fx_param_t FXP_PLAIN[]  = { P_MIX, P_VOLUME };
+#define N(a) ((uint8_t)(sizeof(a) / sizeof((a)[0])))
+
+/* Fixed Effects: Ein/Aus-Nummer auf Seite 5 (laut PySwitch). Die Regler
+ * (Bezeichnungen wie im Rig Manager) liegen direkt hinter dem Schalter, in
+ * der Reihenfolge des Rig Managers: der Abstand der Schalter passt dazu
+ * (Chorus hat drei Regler und belegt zehn Nummern). Nicht dokumentiert. */
+static const uint8_t FIX_NR[KP_FIX_COUNT] = { 1, 6, 11, 16, 21, 26, 36, 41 };
+static const char * const FIX_NAME[KP_FIX_COUNT] = {
+    "Transpose", "Noise Gate", "Compressor", "Pure Booster", "Wah Wah", "Vintage Chorus",
+    "Air Chorus", "Double Tracker"
+};
+static const kp_cat_t FIX_CAT[KP_FIX_COUNT] = {
+    KP_CAT_PITCH, KP_CAT_GATE, KP_CAT_COMP, KP_CAT_BOOST, KP_CAT_WAH, KP_CAT_CHORUS,
+    KP_CAT_CHORUS, KP_CAT_EQ
+};
+static const kp_fx_param_t FIXP_TRANSPOSE[] = { {  2, "Pitch" } };
+static const kp_fx_param_t FIXP_GATE[]      = { {  7, "Threshold" }, {  8, "Decay" } };
+static const kp_fx_param_t FIXP_COMP[]      = { { 12, "Threshold" } };
+static const kp_fx_param_t FIXP_BOOST[]     = { { 17, "Volume" } };
+static const kp_fx_param_t FIXP_WAH[]       = { { 22, "Wah Mode" } };
+static const kp_fx_param_t FIXP_CHORUS[]    = { { 27, "Rate" }, { 28, "Depth" }, { 29, "Mix" } };
+static const kp_fx_param_t FIXP_AIR[]       = { { 37, "Depth" }, { 38, "Mix" } };
+static const kp_fx_param_t FIXP_DOUBLE[]    = { { 42, "Looseness" }, { 43, "Stereo" } };
+static const struct { const kp_fx_param_t * p; uint8_t n; } FIX_PARAMS[KP_FIX_COUNT] = {
+    { FIXP_TRANSPOSE, 1 }, { FIXP_GATE, 2 }, { FIXP_COMP, 1 }, { FIXP_BOOST, 1 },
+    { FIXP_WAH, 1 }, { FIXP_CHORUS, 3 }, { FIXP_AIR, 2 }, { FIXP_DOUBLE, 2 },
+};
 
 static const char * const CAT_NAME[KP_CAT_COUNT] = {
     "Leer", "Wah", "Distortion", "Booster", "Equalizer", "Compressor",
     "Noise Gate", "Chorus", "Phaser / Flanger", "Pitch Shifter", "Delay", "Reverb",
+    "Looper",
 };
 
 static const uint32_t CAT_COLOR[KP_CAT_COUNT] = {
@@ -72,6 +220,7 @@ static const uint32_t CAT_COLOR[KP_CAT_COUNT] = {
     0xd8dce2,   /* Pitch   weiss  */
     0x46c26b,   /* Delay   gruen  */
     0x2fb3a0,   /* Reverb  gruen  */
+    0xb8bec7,   /* Looper  grau   */
 };
 
 static const char * const MOD_NAME[KP_MOD_COUNT] = {
@@ -131,6 +280,7 @@ static struct {
     char          tuner_note[4];
     int8_t        tuner_cents;
     uint16_t      tuner_ref;
+    int8_t        fixed[KP_FIX_COUNT];   /* -1 = unbekannt */
     kp_listener_t listener;
 } s;
 
@@ -170,7 +320,8 @@ static void mark_edited(void)
 #define WEAK __attribute__((weak))
 WEAK void kp_link_load_rig(uint8_t bank, uint8_t slot) { (void)bank; (void)slot; }
 WEAK void kp_link_module_on(kp_mod_t m, bool on)       { (void)m; (void)on; }
-WEAK void kp_link_module_type(kp_mod_t m, uint8_t t)   { (void)m; (void)t; }
+WEAK void kp_link_module_type(kp_mod_t m, uint16_t t)  { (void)m; (void)t; }
+WEAK void kp_link_fixed(kp_fixed_t f, bool on)         { (void)f; (void)on; }
 WEAK void kp_link_fx_button(uint8_t btn, bool on)      { (void)btn; (void)on; }
 WEAK void kp_link_param(kp_param_t p, int16_t v)       { (void)p; (void)v; }
 WEAK void kp_link_tap(void)                            { }
@@ -191,11 +342,13 @@ void kp_init(void)
     memset(&s, 0, sizeof(s));
     memset(s_names, 0, sizeof(s_names));
     s.level = KP_LEVEL_1;
+    s.fs_mode = KP_FS_MODE_FX;      /* unten stehen die Effect Buttons, nicht die Rigs */
     rig_clear(&s.rig);
     for (int i = 0; i < KP_P_COUNT; i++) s.global[i] = PARAMS[i].def;
     s.tuner_ref = 440;
     s.tuner_mute = true;
     strcpy(s.tuner_note, "-");
+    for (int f = 0; f < KP_FIX_COUNT; f++) s.fixed[f] = -1;
 }
 
 void kp_set_listener(kp_listener_t cb) { s.listener = cb; }
@@ -213,7 +366,7 @@ void kp_set_level(kp_level_t level)
     s.level = level;
     /* Module, die es nicht mehr gibt, leeren */
     for (int m = 0; m < KP_MOD_COUNT; m++) {
-        if (!kp_module_available((kp_mod_t)m)) s.rig.mod[m].type = 0, s.rig.mod[m].on = false;
+        if (!kp_module_available((kp_mod_t)m)) memset(&s.rig.mod[m], 0, sizeof(s.rig.mod[m]));
     }
     for (int b = 0; b < KP_FX_BUTTONS; b++) {
         for (int m = 0; m < KP_MOD_COUNT; m++)
@@ -247,9 +400,83 @@ const char * kp_module_name(kp_mod_t m)
 
 uint8_t kp_effect_count(void) { return EFFECT_COUNT; }
 
-const kp_effect_t * kp_effect(uint8_t type)
+const kp_effect_t * kp_effect_at(uint8_t idx)
 {
-    return &EFFECTS[type < EFFECT_COUNT ? type : 0];
+    return &EFFECTS[idx < EFFECT_COUNT ? idx : 0];
+}
+
+/* Kategorie aus dem Nummernbereich (fuer Typen, die nicht im Katalog stehen) */
+kp_cat_t kp_effect_cat(uint16_t t)
+{
+    for (uint8_t i = 0; i < EFFECT_COUNT; i++) if (EFFECTS[i].id == t) return EFFECTS[i].cat;
+    if (t == 0)               return KP_CAT_NONE;
+    if (t <= 13)              return KP_CAT_WAH;
+    if (t >= 17 && t <= 47)   return KP_CAT_DIST;
+    if (t >= 48 && t <= 55)   return KP_CAT_COMP;
+    if (t >= 56 && t <= 63)   return KP_CAT_GATE;
+    if (t >= 64 && t <= 80)   return KP_CAT_CHORUS;
+    if (t >= 81 && t <= 95)   return KP_CAT_PHASER;
+    if (t >= 96 && t <= 111)  return KP_CAT_EQ;
+    if (t >= 112 && t <= 119) return KP_CAT_BOOST;
+    if (t >= 120 && t <= 127) return KP_CAT_LOOPER;
+    if (t >= 128 && t <= 135) return KP_CAT_PITCH;
+    if (t >= 136 && t <= 175) return KP_CAT_DELAY;
+    if (t >= 176 && t <= 199) return KP_CAT_REVERB;
+    return KP_CAT_NONE;
+}
+
+const kp_effect_t * kp_effect(uint16_t type)
+{
+    /* Platzhalter fuer unbekannte Typen: Name der Kategorie */
+    static const kp_effect_t UNKNOWN[KP_CAT_COUNT] = {
+        { 0xFFFF, "Effekt",           KP_CAT_NONE,   false },
+        { 0xFFFF, "Wah",              KP_CAT_WAH,    false },
+        { 0xFFFF, "Distortion",       KP_CAT_DIST,   false },
+        { 0xFFFF, "Booster",          KP_CAT_BOOST,  false },
+        { 0xFFFF, "Equalizer",        KP_CAT_EQ,     false },
+        { 0xFFFF, "Compressor",       KP_CAT_COMP,   false },
+        { 0xFFFF, "Noise Gate",       KP_CAT_GATE,   false },
+        { 0xFFFF, "Chorus",           KP_CAT_CHORUS, false },
+        { 0xFFFF, "Phaser / Flanger", KP_CAT_PHASER, false },
+        { 0xFFFF, "Pitch Shifter",    KP_CAT_PITCH,  false },
+        { 0xFFFF, "Delay",            KP_CAT_DELAY,  false },
+        { 0xFFFF, "Reverb",           KP_CAT_REVERB, false },
+        { 0xFFFF, "Looper",           KP_CAT_LOOPER, false },
+    };
+    for (uint8_t i = 0; i < EFFECT_COUNT; i++) if (EFFECTS[i].id == type) return &EFFECTS[i];
+    return &UNKNOWN[kp_effect_cat(type)];
+}
+
+uint8_t kp_fx_params(uint16_t type, const kp_fx_param_t ** list)
+{
+    const kp_fx_param_t * l;
+    uint8_t n;
+    switch (kp_effect_cat(type)) {
+    case KP_CAT_WAH:    l = FXP_WAH;    n = N(FXP_WAH);    break;
+    case KP_CAT_DIST:   l = FXP_DIST;   n = N(FXP_DIST);   break;
+    case KP_CAT_BOOST:  l = FXP_BOOST;  n = N(FXP_BOOST);  break;
+    case KP_CAT_COMP:   l = FXP_COMP;   n = N(FXP_COMP);   break;
+    case KP_CAT_GATE:   l = FXP_GATE;   n = N(FXP_GATE);   break;
+    case KP_CAT_CHORUS:
+        if (type == 69) { l = FXP_ROTARY; n = N(FXP_ROTARY); }
+        else            { l = FXP_MOD;    n = N(FXP_MOD);    }
+        break;
+    case KP_CAT_PHASER: l = FXP_MOD;    n = N(FXP_MOD);    break;
+    case KP_CAT_EQ:
+        if (type == 97)      { l = FXP_GEQ; n = N(FXP_GEQ); }
+        else if (type == 98) { l = FXP_SEQ; n = N(FXP_SEQ); }
+        else                 { l = FXP_EQ;  n = N(FXP_EQ);  }
+        break;
+    case KP_CAT_PITCH:  l = FXP_PITCH;  n = N(FXP_PITCH);  break;
+    case KP_CAT_DELAY:  l = FXP_DELAY;  n = N(FXP_DELAY);  break;
+    case KP_CAT_REVERB: l = FXP_REVERB; n = N(FXP_REVERB); break;
+    case KP_CAT_NONE:
+        if (type == 0) { l = NULL; n = 0; break; }
+        /* fall through */
+    default:            l = FXP_PLAIN;  n = N(FXP_PLAIN);  break;
+    }
+    if (list) *list = l;
+    return n;
 }
 
 const char * kp_cat_name(kp_cat_t c)  { return CAT_NAME[c < KP_CAT_COUNT ? c : 0]; }
@@ -340,9 +567,17 @@ void kp_module_toggle(kp_mod_t m)
     kp_module_set_on(m, !s.rig.mod[m].on);
 }
 
-void kp_module_set_type(kp_mod_t m, uint8_t type)
+const char * kp_module_fx_name(kp_mod_t m)
 {
-    if (m >= KP_MOD_COUNT || !kp_module_available(m) || type >= EFFECT_COUNT) return;
+    if (m >= KP_MOD_COUNT) return "";
+    const kp_module_t * md = &s.rig.mod[m];
+    return md->name[0] ? md->name : kp_effect(md->type)->name;
+}
+
+void kp_module_set_type(kp_mod_t m, uint16_t type)
+{
+    if (m >= KP_MOD_COUNT || !kp_module_available(m)) return;
+    s.rig.mod[m].name[0] = '\0';            /* Katalogname, bis der Kemper antwortet */
     kp_module_t * md = &s.rig.mod[m];
     md->type = type;
     md->on = type != 0;                        /* neuer Effekt ist an, leer ist aus */
@@ -556,21 +791,7 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
     snprintf(o->top, sizeof(o->top), "FS%u", (unsigned)(idx + 1));
     if (idx >= KP_FOOTSWITCHES) return;
 
-    if (s.fs_mode == KP_FS_MODE_RIGS) {
-        if (idx < KP_RIGS_PER_BANK) {
-            const char * n = s_names[s.bank][idx];
-            bool cur = idx == s.slot;
-            if (cur && s.rig.name[0]) n = s.rig.name;   /* evtl. umbenannt */
-            copy_name(o->main, n[0] ? n : "Leer");
-            o->empty = n[0] == 0;
-            snprintf(o->sub, sizeof(o->sub), "Rig %u", (unsigned)(idx + 1));
-            o->active = cur;
-            o->led = cur ? BANK_COLOR[s.bank % 5] : 0;
-        } else {
-            copy_name(o->main, "Effekte");
-            snprintf(o->sub, sizeof(o->sub), "Modus");
-        }
-    } else {
+    {
         if (idx < KP_FX_BUTTONS) {
             uint8_t mask = s.rig.fx_btn[idx];
             char buf[KP_NAME_LEN] = "";
@@ -579,7 +800,7 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
                 if (!(mask & (1u << m))) continue;
                 if (buf[0]) strncat(buf, " + ", sizeof(buf) - strlen(buf) - 1);
                 strncat(buf, MOD_NAME[m], sizeof(buf) - strlen(buf) - 1);
-                if (!col && s.rig.mod[m].type) col = CAT_COLOR[EFFECTS[s.rig.mod[m].type].cat];
+                if (!col && s.rig.mod[m].type) col = CAT_COLOR[kp_effect_cat(s.rig.mod[m].type)];
             }
             copy_name(o->main, buf[0] ? buf : "nicht belegt");
             o->empty = mask == 0;
@@ -591,8 +812,8 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
             if (s.rig.tempo_on) snprintf(o->sub, sizeof(o->sub), "%u BPM", s.rig.tempo_bpm);
             else                snprintf(o->sub, sizeof(o->sub), "Tempo aus");
         } else {
-            copy_name(o->main, "Rigs");
-            snprintf(o->sub, sizeof(o->sub), "Modus");
+            o->empty = true;             /* FS6: nicht belegt */
+            copy_name(o->main, "-");
         }
     }
 }
@@ -600,14 +821,8 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
 void kp_footswitch(uint8_t idx, uint32_t now_ms)
 {
     if (idx >= KP_FOOTSWITCHES) return;
-    if (s.fs_mode == KP_FS_MODE_RIGS) {
-        if (idx < KP_RIGS_PER_BANK) kp_select_rig(s.bank, idx);
-        else                        kp_fs_set_mode(KP_FS_MODE_FX);
-    } else {
-        if (idx < KP_FX_BUTTONS)  kp_fx_button_press(idx);
-        else if (idx == 4)        kp_tap(now_ms);
-        else                      kp_fs_set_mode(KP_FS_MODE_RIGS);
-    }
+    if (idx < KP_FX_BUTTONS)  kp_fx_button_press(idx);
+    else if (idx == 4)        kp_tap(now_ms);
 }
 
 /* ------------------------------------------------------------------------
@@ -616,6 +831,7 @@ void kp_footswitch(uint8_t idx, uint32_t now_ms)
 void kp_rx_connected(bool connected)
 {
     s.connected = connected;
+    if (!connected) for (int f = 0; f < KP_FIX_COUNT; f++) s.fixed[f] = -1;
     notify(KP_CHG_SYSTEM);
 }
 
@@ -642,6 +858,14 @@ void kp_rx_rig_loaded(uint8_t bank, uint8_t slot)
     notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);
 }
 
+void kp_rx_rig_changed(const char * name)
+{
+    rig_clear(&s.rig);
+    copy_name(s.rig.name, name);
+    s.tap_n = 0;
+    notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);
+}
+
 void kp_rx_stack(const char * amp, const char * cab)
 {
     copy_name(s.rig.amp, amp);
@@ -649,12 +873,57 @@ void kp_rx_stack(const char * amp, const char * cab)
     notify(KP_CHG_RIG);
 }
 
-void kp_rx_module(kp_mod_t m, uint8_t type, bool on)
+void kp_rx_module_type(kp_mod_t m, uint16_t type)
 {
     if (m >= KP_MOD_COUNT) return;
-    s.rig.mod[m].type = type < EFFECT_COUNT ? type : 0;
-    s.rig.mod[m].on = on && s.rig.mod[m].type;
-    notify(KP_CHG_MODULES | KP_CHG_RIG);
+    kp_module_t * md = &s.rig.mod[m];
+    if (md->type != type) md->name[0] = '\0';
+    md->type = type;
+    notify(KP_CHG_MODULES);
+}
+
+void kp_rx_module_on(kp_mod_t m, bool on)
+{
+    if (m >= KP_MOD_COUNT) return;
+    s.rig.mod[m].on = on;
+    notify(KP_CHG_MODULES);
+}
+
+void kp_rx_module_name(kp_mod_t m, const char * name)
+{
+    if (m >= KP_MOD_COUNT) return;
+    copy_name(s.rig.mod[m].name, name);
+    notify(KP_CHG_MODULES);
+}
+
+/* ------------------------------------------------------------------------
+ * Fixed Effects
+ * --------------------------------------------------------------------- */
+const char * kp_fixed_name(kp_fixed_t f) { return f < KP_FIX_COUNT ? FIX_NAME[f] : ""; }
+kp_cat_t kp_fixed_cat(kp_fixed_t f)      { return f < KP_FIX_COUNT ? FIX_CAT[f] : KP_CAT_NONE; }
+int8_t kp_fixed_state(kp_fixed_t f)      { return f < KP_FIX_COUNT ? s.fixed[f] : -1; }
+uint8_t kp_fixed_nr(kp_fixed_t f)        { return f < KP_FIX_COUNT ? FIX_NR[f] : 0; }
+
+uint8_t kp_fixed_params(kp_fixed_t f, const kp_fx_param_t ** list)
+{
+    if (f >= KP_FIX_COUNT) return 0;
+    if (list) *list = FIX_PARAMS[f].p;
+    return FIX_PARAMS[f].n;
+}
+
+void kp_fixed_toggle(kp_fixed_t f)
+{
+    if (f >= KP_FIX_COUNT || !s.connected) return;   /* ohne Kemper kein Zustand */
+    s.fixed[f] = s.fixed[f] == 1 ? 0 : 1;
+    kp_link_fixed(f, s.fixed[f] == 1);
+    notify(KP_CHG_FIXED);
+}
+
+void kp_rx_fixed(kp_fixed_t f, int8_t state)
+{
+    if (f >= KP_FIX_COUNT) return;
+    s.fixed[f] = state;
+    notify(KP_CHG_FIXED);
 }
 
 void kp_rx_param(kp_param_t p, int16_t v)

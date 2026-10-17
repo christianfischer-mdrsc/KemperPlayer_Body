@@ -5,8 +5,8 @@
  *  - Bank (antippen = Bank-Uebersicht, Pfeile = Bank wechseln)
  *  - Rig-Name, Amp/Cab
  *  - Tempo (antippen = Tap Tempo)
- *  - Effektkette (antippen = Modul ein/aus)
- *  - Footswitch-Leiste FS1-FS6
+ *  - Fixed Effects und Effektkette (antippen = ein/aus, halten = Einstellungen)
+ *  - Footswitch-Leiste FS1-FS6 (Rigs bzw. Effect Buttons)
  */
 #include "ui_common.h"
 #include "ui_screens.h"
@@ -22,6 +22,7 @@ static struct {
     lv_obj_t * rig;
     lv_obj_t * stack;
     ui_chain_t chain;
+    ui_fixed_row_t fixed;
     ui_fsbar_t fs;
 } w;
 
@@ -65,6 +66,7 @@ static void refresh(uint32_t chg)
     if (chg & (KP_CHG_RIG | KP_CHG_SYSTEM | KP_CHG_NAMES)) update_rig();
     if (chg & (KP_CHG_TEMPO | KP_CHG_RIG))  update_tempo();
     if (chg & (KP_CHG_MODULES | KP_CHG_RIG)) ui_chain_update(&w.chain);
+    if (chg & (KP_CHG_FIXED | KP_CHG_SYSTEM)) ui_fixed_update(&w.fixed);
     ui_fsbar_update(&w.fs);
 }
 
@@ -72,6 +74,7 @@ static void refresh(uint32_t chg)
 static void bank_cb(lv_event_t * e)    { (void)e; ui_nav_go(UI_SCR_BANKS); }
 static void bank_prev_cb(lv_event_t * e) { (void)e; kp_bank_step(-1); }
 static void bank_next_cb(lv_event_t * e) { (void)e; kp_bank_step(+1); }
+static void home_cb(lv_event_t * e)    { (void)e; ui_nav_go(UI_SCR_HOME); }
 static void edit_cb(lv_event_t * e)    { (void)e; ui_nav_go(UI_SCR_EDIT); }
 static void tap_cb(lv_event_t * e)     { (void)e; kp_tap(lv_tick_get()); }
 
@@ -79,6 +82,12 @@ static void tile_cb(lv_event_t * e)
 {
     uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
     if (w.chain.id[i] != KP_CHAIN_STACK) kp_module_toggle((kp_mod_t)w.chain.id[i]);
+}
+
+static void tile_long_cb(lv_event_t * e)
+{
+    uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    if (w.chain.id[i] != KP_CHAIN_STACK) ui_fx_dialog((kp_mod_t)w.chain.id[i]);
 }
 
 /* ---- Aufbau ----------------------------------------------------------- */
@@ -89,6 +98,8 @@ lv_obj_t * ui_live_build(void)
 
     /* Kopfzeile */
     lv_obj_t * head = ui_row(body, 10);
+    lv_obj_t * home = ui_icon_button(head, LV_SYMBOL_HOME, false);
+    lv_obj_add_event_cb(home, home_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t * prev = ui_icon_button(head, LV_SYMBOL_LEFT, false);
     lv_obj_add_event_cb(prev, bank_prev_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t * chip = ui_bank_chip(head, &w.bank_lbl, &w.bank_dot);
@@ -132,8 +143,9 @@ lv_obj_t * ui_live_build(void)
 
     ui_spacer(body, LV_PCT(100), 1, true);
 
-    ui_chain_create(&w.chain, body, false, tile_cb);
-    ui_spacer(body, LV_PCT(100), 22, false);
+    ui_fixed_create(&w.fixed, body);
+    ui_chain_create(&w.chain, body, false, tile_cb, tile_long_cb);
+    ui_spacer(body, LV_PCT(100), 8, false);
     ui_fsbar_create(&w.fs, body);
 
     update_rig();
@@ -146,7 +158,7 @@ lv_obj_t * ui_live_build(void)
 void ui_start(void)
 {
     kp_init();
-    lv_obj_t * scr = ui_nav_build(UI_SCR_LIVE);
+    lv_obj_t * scr = ui_nav_build(UI_SCR_HOME);
 
     /* Startbildschirm abschliessen (Bootzeit stoppen, danach Ueberblendung).
      * Ohne vorherigen ui_boot_create() wird die Live-Ansicht direkt geladen. */

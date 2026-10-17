@@ -101,7 +101,7 @@ lv_obj_t * ui_banks_build(void)
 
     /* Zurueck dorthin, wo man herkam */
     w.back = ui_nav_previous();
-    if (w.back != UI_SCR_EDIT) w.back = UI_SCR_LIVE;
+    if (w.back != UI_SCR_EDIT && w.back != UI_SCR_HOME) w.back = UI_SCR_LIVE;
     w.browse = kp_bank();
 
     lv_obj_t * tb = ui_title_bar(body, "Banks und Rigs", w.back);

@@ -11,11 +11,11 @@
 
 /* Zeilen im Abschnitt "Kemper-Verbindung" */
 enum {
-    KR_USB = 0, KR_RIG1, KR_RIG, KR_STACK, KR_TEMPO, KR_FIRMWARE,
+    KR_USB = 0, KR_RIG, KR_STACK, KR_TEMPO, KR_FIRMWARE,
     KR_SENSE, KR_STATS, KR_COUNT
 };
 static const char * const KR_NAME[KR_COUNT] = {
-    "USB", "Rig 1 (Bank 1)", "Aktuelles Rig", "Amp / Cab", "Rig-Tempo", "Firmware",
+    "USB", "Aktuelles Rig", "Amp / Cab", "Rig-Tempo", "Firmware",
     "Lebenszeichen", "Nachrichten"
 };
 
@@ -26,7 +26,6 @@ static const char * const KR_NAME[KR_COUNT] = {
 static struct {
     lv_obj_t * level[3];
     lv_obj_t * level_info;
-    lv_obj_t * fsm[2];
     lv_obj_t * bright;
     lv_obj_t * bright_val;
     lv_obj_t * roller[5];          /* Tag, Monat, Jahr, Stunde, Minute */
@@ -77,7 +76,6 @@ static void update_link(void)
     } else {
         lv_label_set_text(w.k_val[KR_FIRMWARE], ok ? "vom Kemper nicht gemeldet" : "-");
     }
-    lv_label_set_text(w.k_val[KR_RIG1], i.rig1_name[0] ? i.rig1_name : (ok ? "keine Antwort" : "-"));
     lv_label_set_text(w.k_val[KR_RIG], i.rig_name[0] ? i.rig_name : "-");
     if (i.amp_name[0] || i.cab_name[0]) {
         lv_snprintf(buf, sizeof(buf), "%s / %s", i.amp_name[0] ? i.amp_name : "-",
@@ -136,8 +134,6 @@ static void update(void)
         lv_label_set_text(w.level_info, "8 Effektmodule (A-D, X, MOD, DLY, REV), 125 Banks = 625 Rigs");
     else
         lv_label_set_text(w.level_info, "4 Effektmodule (A, B, DLY, REV), 10 Banks = 50 Rigs");
-    ui_button_set_selected(w.fsm[0], kp_fs_mode() == KP_FS_MODE_RIGS);
-    ui_button_set_selected(w.fsm[1], kp_fs_mode() == KP_FS_MODE_FX);
     update_link();
 }
 
@@ -150,11 +146,6 @@ static void level_cb(lv_event_t * e)
 {
     kp_set_level((kp_level_t)(uintptr_t)lv_event_get_user_data(e));
     update();
-}
-
-static void fsm_cb(lv_event_t * e)
-{
-    kp_fs_set_mode((kp_fs_mode_t)(uintptr_t)lv_event_get_user_data(e));
 }
 
 static void bright_cb(lv_event_t * e)
@@ -218,6 +209,26 @@ static lv_obj_t * roller(lv_obj_t * parent, const char * opts, uint32_t sel, int
     return r;
 }
 
+/*
+ * Spalte, die senkrecht scrollt, wenn ihr Inhalt hoeher als der Bildschirm ist.
+ * LVGL sucht das Scroll-Ziel ab dem beruehrten Objekt, und als beruehrt gilt
+ * nur ein anklickbares Objekt. Labels und Kacheln sind es nicht; ohne
+ * CLICKABLE landete die Wischgeste beim (nicht scrollbaren) Screen.
+ */
+static lv_obj_t * scroll_col(lv_obj_t * parent)
+{
+    lv_obj_t * c = ui_col(parent, 12);
+    lv_obj_set_width(c, 1);
+    lv_obj_set_flex_grow(c, 1);
+    lv_obj_set_height(c, LV_PCT(100));
+    lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(c, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(c, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_set_style_pad_right(c, 6, 0);       /* Platz fuer den Scrollbalken */
+    lv_obj_set_style_pad_bottom(c, 12, 0);
+    return c;
+}
+
 /* Optionstext "a\nb\n..." fuer Zahlenbereiche */
 static void num_opts(char * buf, uint32_t len, int from, int to, bool two_digits)
 {
@@ -232,22 +243,13 @@ lv_obj_t * ui_settings_build(void)
 {
     lv_obj_t * body;
     lv_obj_t * scr = ui_screen_base(&body);
-    ui_title_bar(body, "System", UI_SCR_EDIT);
+    ui_title_bar(body, "System", ui_nav_previous() == UI_SCR_HOME ? UI_SCR_HOME : UI_SCR_EDIT);
 
     lv_obj_t * cols = ui_row(body, 12);
     lv_obj_set_flex_grow(cols, 1);
     lv_obj_set_flex_align(cols, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_t * left = ui_col(cols, 12);
-    lv_obj_set_width(left, 1);
-    lv_obj_set_flex_grow(left, 1);
-    lv_obj_t * right = ui_col(cols, 12);
-    lv_obj_set_width(right, 1);
-    lv_obj_set_flex_grow(right, 1);
-    /* Rechte Spalte ist hoeher als der Bildschirm: senkrecht scrollen */
-    lv_obj_set_height(right, LV_PCT(100));
-    lv_obj_set_scrollable(right, true);
-    lv_obj_set_scroll_dir(right, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(right, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_t * left = scroll_col(cols);
+    lv_obj_t * right = scroll_col(cols);
 
     /* Player-Level */
     lv_obj_t * p = section(left, "Kemper Player");
@@ -263,19 +265,6 @@ lv_obj_t * ui_settings_build(void)
                                UI_COL_TEXT3, &lv_font_montserrat_14);
     lv_obj_set_width(hint, LV_PCT(100));
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
-
-    /* Footswitches */
-    p = section(left, "Footswitches");
-    r = ui_row(p, 8);
-    w.fsm[0] = ui_button(r, "Rigs", &lv_font_montserrat_18, false);
-    lv_obj_set_width(w.fsm[0], 140);
-    lv_obj_add_event_cb(w.fsm[0], fsm_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)KP_FS_MODE_RIGS);
-    w.fsm[1] = ui_button(r, "Effekte", &lv_font_montserrat_18, false);
-    lv_obj_set_width(w.fsm[1], 140);
-    lv_obj_add_event_cb(w.fsm[1], fsm_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)KP_FS_MODE_FX);
-    ui_label(p, "Rigs: FS1-5 laden Rig 1-5 der Bank, FS6 wechselt zu Effekte.\n"
-                "Effekte: FS1-4 = Effect Button I-IIII, FS5 = Tap, FS6 = Rigs.",
-             UI_COL_TEXT3, &lv_font_montserrat_14);
 
     /* Display */
     p = section(left, "Display");

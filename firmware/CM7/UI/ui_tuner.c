@@ -77,7 +77,8 @@ lv_obj_t * ui_tuner_build(void)
 {
     lv_obj_t * body;
     lv_obj_t * scr = ui_screen_base(&body);
-    ui_scr_t back = ui_nav_previous() == UI_SCR_EDIT ? UI_SCR_EDIT : UI_SCR_LIVE;
+    ui_scr_t back = ui_nav_previous();
+    if (back != UI_SCR_EDIT && back != UI_SCR_HOME) back = UI_SCR_LIVE;
     ui_title_bar(body, "Tuner", back);
 
     lv_obj_t * p = ui_panel(body);
