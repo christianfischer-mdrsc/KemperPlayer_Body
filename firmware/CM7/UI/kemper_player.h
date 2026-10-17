@@ -18,6 +18,12 @@
  * von der USB-MIDI-Anbindung ueberschrieben. Umgekehrt meldet die Anbindung
  * Daten vom Kemper ueber die kp_rx_*()-Funktionen.
  *
+ * Pro Rig-Platz (Bank/Rig) speichert das Display selbst die Belegung der
+ * Footswitches und die Zuweisung der Effect Buttons (kp_rig_setup_t); dazu
+ * globale Einstellungen (kp_global_t). Wohin, entscheiden die kp_store_*()-
+ * Funktionen: schwach definiert = nichts speichern, auf dem Board SD-Karte
+ * (kp_storage.c).
+ *
  * Alle Funktionen nur aus dem LVGL-Task aufrufen (bzw. mit dessen Sperre).
  */
 #ifndef KEMPER_PLAYER_H
@@ -214,6 +220,29 @@ typedef struct {
     uint32_t led;                /* Farbe der LED, 0 = keine */
 } kp_fs_info_t;
 
+/* Auf dem Display gespeicherte Einstellungen eines Rig-Platzes */
+typedef struct {
+    kp_fs_assign_t fs[KP_FOOTSWITCHES];
+    uint8_t        fx_btn[KP_FX_BUTTONS];   /* Bitmaske der Module je Effect Button */
+} kp_rig_setup_t;
+
+/* Globale Einstellungen des Displays */
+typedef struct {
+    uint8_t        level;                   /* kp_level_t */
+    uint8_t        brightness;              /* 5..100 % */
+    uint16_t       tuner_ref;               /* Hz */
+    bool           tuner_mute;
+    kp_fs_assign_t fs_default[KP_FOOTSWITCHES];   /* Belegung fuer Rigs ohne eigene */
+} kp_global_t;
+
+/* Woher die Belegung des aktuellen Rigs stammt */
+typedef enum {
+    KP_SETUP_DEFAULT = 0,      /* Standardbelegung (fuer dieses Rig nichts gespeichert) */
+    KP_SETUP_RIG,              /* eigene Belegung dieses Rig-Platzes */
+    KP_SETUP_PENDING,          /* geaendert, Platz noch unbekannt: wird gespeichert,
+                                  sobald der Kemper ihn meldet */
+} kp_setup_src_t;
+
 /* Aenderungs-Flags fuer die Oberflaeche */
 #define KP_CHG_RIG      (1u << 0)   /* anderes Rig/Bank geladen */
 #define KP_CHG_MODULES  (1u << 1)   /* Module/Effect Buttons */
@@ -325,6 +354,17 @@ kp_fs_assign_t kp_fs_assign(uint8_t idx);
 void        kp_fs_set_assign(uint8_t idx, kp_fs_assign_t a);
 /* Beschriftung einer Belegung, z. B. "Effect Button II", "Noise Gate" */
 const char *kp_fs_assign_name(kp_fs_assign_t a);
+kp_setup_src_t kp_setup_source(void);
+/* Belegung des aktuellen Rigs als Standard fuer Rigs ohne eigene uebernehmen */
+void        kp_fs_save_as_default(void);
+/* Eigene Belegung des aktuellen Rigs verwerfen, Standard verwenden */
+void        kp_fs_reset_to_default(void);
+
+/* Display-Helligkeit setzen und speichern */
+void        kp_set_brightness(uint8_t pct);
+/* Gespeicherte Einstellungen sind (wieder) lesbar, z. B. SD-Karte gesteckt:
+ * globale Einstellungen und die Belegung des aktuellen Rigs neu laden */
+void        kp_storage_attached(void);
 /* now_ms: aktuelle Zeit in ms, fuer Tap Tempo */
 void        kp_footswitch(uint8_t idx, uint32_t now_ms);
 
@@ -368,6 +408,19 @@ void kp_rx_tuner(bool signal, const char * note, int8_t cents);
 /* Neue Verbindungsdaten (Seriennummer, Status ...) fuer die Anzeige,
  * abzufragen mit kemper_link_get_info(); meldet KP_CHG_SYSTEM */
 void kp_rx_link_info(void);
+
+/* ---------------------------------------------------------------------
+ * Speicher (schwach definiert: nichts gespeichert; Board: SD-Karte).
+ * idx = Bank * KP_RIGS_PER_BANK + Platz.
+ * ------------------------------------------------------------------ */
+bool        kp_store_rig_load(uint16_t idx, kp_rig_setup_t * out);
+void        kp_store_rig_save(uint16_t idx, const kp_rig_setup_t * in, const char * rig_name);
+void        kp_store_rig_erase(uint16_t idx);
+bool        kp_store_global_load(kp_global_t * out);
+void        kp_store_global_save(const kp_global_t * in);
+/* Kurzer Zustandstext, z. B. "SD-Karte bereit" */
+const char *kp_store_status(void);
+bool        kp_store_ok(void);
 
 /* ---------------------------------------------------------------------
  * Board-Funktionen (schwach definiert, auf dem Board ueberschrieben)

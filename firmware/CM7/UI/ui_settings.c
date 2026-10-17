@@ -1,7 +1,7 @@
 /**
  * @file ui_settings.c
  * System: Ausbaustufe des Players, Footswitch-Modus, Display-Helligkeit,
- * Kemper-Verbindung, Datum/Uhrzeit und Info.
+ * Speicher (SD-Karte), Kemper-Verbindung, Datum/Uhrzeit und Info.
  */
 #include <stdio.h>
 #include "ui_common.h"
@@ -28,6 +28,7 @@ static struct {
     lv_obj_t * level_info;
     lv_obj_t * bright;
     lv_obj_t * bright_val;
+    lv_obj_t * store;
     lv_obj_t * roller[5];          /* Tag, Monat, Jahr, Stunde, Minute */
     lv_obj_t * time_msg;
     lv_obj_t * k_dot;              /* Kemper-Verbindung */
@@ -134,6 +135,12 @@ static void update(void)
         lv_label_set_text(w.level_info, "8 Effektmodule (A-D, X, MOD, DLY, REV), 125 Banks = 625 Rigs");
     else
         lv_label_set_text(w.level_info, "4 Effektmodule (A, B, DLY, REV), 10 Banks = 50 Rigs");
+    lv_label_set_text(w.store, kp_store_status());
+    lv_obj_set_style_text_color(w.store, lv_color_hex(kp_store_ok() ? 0x3ddc84 : UI_COL_TEXT2), 0);
+    if (lv_slider_get_value(w.bright) != kp_hw_brightness()) {   /* von der SD-Karte geladen */
+        lv_slider_set_value(w.bright, kp_hw_brightness(), LV_ANIM_OFF);
+        lv_label_set_text_fmt(w.bright_val, "%u %%", kp_hw_brightness());
+    }
     update_link();
 }
 
@@ -151,7 +158,7 @@ static void level_cb(lv_event_t * e)
 static void bright_cb(lv_event_t * e)
 {
     int v = lv_slider_get_value(lv_event_get_target(e));
-    kp_hw_set_brightness((uint8_t)v);
+    kp_set_brightness((uint8_t)v);           /* wird auch gespeichert */
     lv_label_set_text_fmt(w.bright_val, "%d %%", v);
 }
 
@@ -275,6 +282,17 @@ lv_obj_t * ui_settings_build(void)
     w.bright_val = ui_label(r, "", UI_COL_TEXT, &lv_font_montserrat_18);
     lv_obj_set_width(w.bright_val, 64);
     lv_label_set_text_fmt(w.bright_val, "%u %%", kp_hw_brightness());
+
+    /* Speicher */
+    p = section(left, "Speicher");
+    w.store = ui_label(p, "", UI_COL_TEXT, &lv_font_montserrat_16);
+    lv_obj_set_width(w.store, LV_PCT(100));
+    lv_label_set_long_mode(w.store, LV_LABEL_LONG_WRAP);
+    hint = ui_label(p, "Auf der microSD-Karte (FAT32) liegen pro Rig-Platz die Footswitch-Belegung "
+                       "und die Effect-Button-Zuweisung sowie Helligkeit, Level und Tuner.",
+                    UI_COL_TEXT3, &lv_font_montserrat_14);
+    lv_obj_set_width(hint, LV_PCT(100));
+    lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
 
     /* Kemper-Verbindung */
     p = section(right, "Kemper-Verbindung");

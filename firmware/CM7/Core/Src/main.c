@@ -47,6 +47,7 @@
 #include "ui_boot.h"
 #include "kemper_player.h"
 #include "footswitch.h"
+#include "kp_storage.h"
 #include "lvgl_port_touch.h"
 #include "lvgl_port_display.h"
 #include "kemper_link.h"
@@ -229,7 +230,8 @@ Error_Handler();
   ui_boot_step(1, NULL);                        /* Touch */
   lv_refr_now(NULL);
 
-  /* TODO: Einstellungen aus dem Flash laden */
+  /* Einstellungen kommen von der SD-Karte, sobald der Scheduler laeuft
+   * (kp_storage_start() unten); bis dahin gelten die Standardwerte */
   ui_boot_step(2, NULL);                        /* Speicher */
   lv_refr_now(NULL);
 
@@ -248,6 +250,9 @@ Error_Handler();
 
   /* Verbindungsstatus und Kemper-Daten alle 100 ms ins Modell uebernehmen */
   lv_timer_create(kemper_poll_cb, 100, NULL);
+
+  /* SD-Karte: Einstellungen laden und speichern (im LVGL-Task) */
+  kp_storage_start();
 
   /* pwm */
   if (HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1) != HAL_OK)

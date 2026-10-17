@@ -1226,12 +1226,41 @@ static void fa_pick_cb(lv_event_t * e)
     ui_dialog_close();
 }
 
+static void fa_default_cb(lv_event_t * e)
+{
+    if (lv_event_get_user_data(e)) kp_fs_save_as_default();
+    else                           kp_fs_reset_to_default();
+    ui_dialog_close();
+}
+
+/* Wofuer die Belegung gilt und ob sie gespeichert wird */
+static void fa_status(char * buf, uint32_t len)
+{
+    char pos[24];
+    lv_snprintf(pos, sizeof(pos), "Bank %u / Rig %u", (unsigned)(kp_bank() + 1), (unsigned)(kp_slot() + 1));
+    const char * keep = kp_store_ok() ? "" : " (ohne SD-Karte nur bis zum Ausschalten)";
+    switch (kp_setup_source()) {
+    case KP_SETUP_RIG:
+        lv_snprintf(buf, len, "Eigene Belegung fuer %s%s", pos, keep);
+        break;
+    case KP_SETUP_PENDING:
+        lv_snprintf(buf, len, "Rig-Platz noch unbekannt: wird gespeichert, sobald der Kemper ihn meldet");
+        break;
+    default:
+        if (kp_slot_known())
+            lv_snprintf(buf, len, "Standardbelegung - eine Auswahl gilt nur fuer %s%s", pos, keep);
+        else
+            lv_snprintf(buf, len, "Standardbelegung");
+        break;
+    }
+}
+
 static lv_obj_t * fa_group(lv_obj_t * c, const char * caption)
 {
-    ui_label(c, caption, UI_COL_TEXT3, &lv_font_montserrat_16);
+    ui_label(c, caption, UI_COL_TEXT3, &lv_font_montserrat_14);
     lv_obj_t * g = ui_row(c, 8);
     lv_obj_set_flex_flow(g, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_style_pad_row(g, 8, 0);
+    lv_obj_set_style_pad_row(g, 6, 0);
     return g;
 }
 
@@ -1241,9 +1270,9 @@ static void fa_option(lv_obj_t * g, uint8_t kind, uint8_t idx, const char * txt,
     const kp_fs_assign_t cur = kp_fs_assign(fa.fs);
     lv_obj_t * b = ui_button(g, txt, &lv_font_montserrat_16, cur.kind == kind && (kind == KP_FSA_NONE ||
                              kind == KP_FSA_TAP || cur.idx == idx));
-    lv_obj_set_size(b, 196, 46);
+    lv_obj_set_size(b, 206, 42);
     lv_label_set_long_mode(lv_obj_get_child(b, 0), LV_LABEL_LONG_DOT);
-    lv_obj_set_width(lv_obj_get_child(b, 0), 170);
+    lv_obj_set_width(lv_obj_get_child(b, 0), 180);
     lv_obj_set_style_text_align(lv_obj_get_child(b, 0), LV_TEXT_ALIGN_CENTER, 0);
     if (color) {
         lv_obj_set_style_border_side(b, LV_BORDER_SIDE_LEFT, 0);
@@ -1262,9 +1291,25 @@ void ui_fs_assign_dialog(uint8_t fs)
     lv_obj_t * c;
     if (fs >= KP_FOOTSWITCHES) return;
     lv_snprintf(title, sizeof(title), "FS%u belegen", (unsigned)(fs + 1));
-    ui_dialog_open(title, 900, 560, &c);
+    ui_dialog_open(title, 940, 590, &c);
+    lv_obj_set_style_pad_row(c, 6, 0);
     fa.fs = fs;
     fa.n = 0;
+
+    /* Wofuer die Belegung gilt; Standardbelegung (fuer Rigs ohne eigene) */
+    char st[112];
+    fa_status(st, sizeof(st));
+    lv_obj_t * top = ui_row(c, 8);
+    lv_obj_t * info = ui_label(top, st, UI_COL_ACCENT, &lv_font_montserrat_14);
+    lv_obj_set_width(info, 1);
+    lv_obj_set_flex_grow(info, 1);
+    lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
+    lv_obj_t * def = ui_button(top, "Als Standard", &lv_font_montserrat_14, false);
+    lv_obj_set_height(def, 40);
+    lv_obj_add_event_cb(def, fa_default_cb, LV_EVENT_CLICKED, (void *)1);
+    lv_obj_t * rst = ui_button(top, "Standard verwenden", &lv_font_montserrat_14, false);
+    lv_obj_set_height(rst, 40);
+    lv_obj_add_event_cb(rst, fa_default_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t * g = fa_group(c, "Allgemein");
     fa_option(g, KP_FSA_NONE, 0, "nicht belegt", 0);

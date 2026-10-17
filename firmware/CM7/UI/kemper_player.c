@@ -272,6 +272,10 @@ static struct {
     uint8_t       bank, slot;
     bool          bank_known, slot_known;
     kp_fs_assign_t fs_assign[KP_FOOTSWITCHES];
+    kp_fs_assign_t fs_default[KP_FOOTSWITCHES];
+    kp_setup_src_t setup_src;
+    bool          loading;               /* gespeicherte Werte werden uebernommen */
+    bool          store_attached;        /* Speicher einmal gelesen: erst dann global speichern */
     kp_rig_t      rig;
     int16_t       global[KP_P_COUNT];    /* Output-Parameter */
     kp_fs_mode_t  fs_mode;
@@ -334,9 +338,142 @@ WEAK void kp_link_tuner(bool on)                       { (void)on; }
 WEAK void kp_link_morph(uint8_t pct)                   { (void)pct; }
 WEAK void kp_link_rig_name(const char * name)          { (void)name; }
 
+WEAK bool kp_store_rig_load(uint16_t idx, kp_rig_setup_t * out)  { (void)idx; (void)out; return false; }
+WEAK void kp_store_rig_save(uint16_t idx, const kp_rig_setup_t * in, const char * n) { (void)idx; (void)in; (void)n; }
+WEAK void kp_store_rig_erase(uint16_t idx)                          { (void)idx; }
+WEAK bool kp_store_global_load(kp_global_t * out)                   { (void)out; return false; }
+WEAK void kp_store_global_save(const kp_global_t * in)              { (void)in; }
+WEAK const char * kp_store_status(void)                             { return "kein Speicher vorhanden"; }
+WEAK bool kp_store_ok(void)                                         { return false; }
+
 static uint8_t s_brightness = 100;
 WEAK void kp_hw_set_brightness(uint8_t pct)            { s_brightness = pct; }
 WEAK uint8_t kp_hw_brightness(void)                    { return s_brightness; }
+
+/* ------------------------------------------------------------------------
+ * Gespeicherte Einstellungen (pro Rig-Platz und global)
+ * --------------------------------------------------------------------- */
+static uint16_t rig_index(void)
+{
+    return (uint16_t)(s.bank * KP_RIGS_PER_BANK + s.slot);
+}
+
+static bool assign_valid(kp_fs_assign_t a)
+{
+    switch (a.kind) {
+    case KP_FSA_NONE:
+    case KP_FSA_TAP:       return true;
+    case KP_FSA_FX_BUTTON: return a.idx < KP_FX_BUTTONS;
+    case KP_FSA_MODULE:    return a.idx < KP_MOD_COUNT;
+    case KP_FSA_FIXED:     return a.idx < KP_FIX_COUNT;
+    default:               return false;
+    }
+}
+
+static void use_default_fs(void)
+{
+    memcpy(s.fs_assign, s.fs_default, sizeof(s.fs_assign));
+}
+
+/* Belegung des aktuellen Rigs laden (Platz unbekannt oder nichts
+ * gespeichert: Standard, keine Effect-Button-Zuweisung) */
+static void setup_load(void)
+{
+    kp_rig_setup_t st;
+    if (s.slot_known && kp_store_rig_load(rig_index(), &st)) {
+        for (int i = 0; i < KP_FOOTSWITCHES; i++)
+            s.fs_assign[i] = assign_valid(st.fs[i]) ? st.fs[i] : s.fs_default[i];
+        for (int b = 0; b < KP_FX_BUTTONS; b++) {
+            uint8_t mask = st.fx_btn[b];
+            for (int m = 0; m < KP_MOD_COUNT; m++)
+                if (!kp_module_available((kp_mod_t)m)) mask &= (uint8_t)~(1u << m);
+            s.rig.fx_btn[b] = mask;
+        }
+        s.setup_src = KP_SETUP_RIG;
+    } else {
+        use_default_fs();
+        memset(s.rig.fx_btn, 0, sizeof(s.rig.fx_btn));
+        s.setup_src = KP_SETUP_DEFAULT;
+    }
+}
+
+/* Belegung wurde geaendert: fuer diesen Rig-Platz speichern */
+static void setup_changed(void)
+{
+    if (s.loading) return;
+    if (!s.slot_known) {
+        s.setup_src = KP_SETUP_PENDING;      /* speichern, sobald der Platz bekannt ist */
+        return;
+    }
+    kp_rig_setup_t st;
+    memcpy(st.fs, s.fs_assign, sizeof(st.fs));
+    memcpy(st.fx_btn, s.rig.fx_btn, sizeof(st.fx_btn));
+    kp_store_rig_save(rig_index(), &st, s.rig.name);
+    s.setup_src = KP_SETUP_RIG;
+}
+
+static void global_save(void)
+{
+    if (s.loading || !s.store_attached) return;   /* sonst ueberschriebe der Start die Datei */
+    kp_global_t g;
+    memset(&g, 0, sizeof(g));
+    g.level = (uint8_t)s.level;
+    g.brightness = kp_hw_brightness();
+    g.tuner_ref = s.tuner_ref;
+    g.tuner_mute = s.tuner_mute;
+    memcpy(g.fs_default, s.fs_default, sizeof(g.fs_default));
+    kp_store_global_save(&g);
+}
+
+void kp_storage_attached(void)
+{
+    kp_global_t g;
+    s.loading = true;
+    if (kp_store_global_load(&g)) {
+        if (!s.connected) kp_set_level((kp_level_t)g.level);   /* mit Kemper: dessen Level */
+        if (g.brightness >= 5 && g.brightness <= 100) kp_hw_set_brightness(g.brightness);
+        if (g.tuner_ref >= 424 && g.tuner_ref <= 456) s.tuner_ref = g.tuner_ref;
+        s.tuner_mute = g.tuner_mute;
+        for (int i = 0; i < KP_FOOTSWITCHES; i++)
+            if (assign_valid(g.fs_default[i])) s.fs_default[i] = g.fs_default[i];
+    }
+    if (s.setup_src != KP_SETUP_PENDING) setup_load();
+    s.loading = false;
+    s.store_attached = true;
+    notify(KP_CHG_ALL);
+}
+
+kp_setup_src_t kp_setup_source(void) { return s.setup_src; }
+
+void kp_fs_save_as_default(void)
+{
+    memcpy(s.fs_default, s.fs_assign, sizeof(s.fs_default));
+    global_save();
+    notify(KP_CHG_SYSTEM);
+}
+
+void kp_fs_reset_to_default(void)
+{
+    use_default_fs();
+    if (s.slot_known) {
+        /* Effect-Button-Zuweisung bleibt, dann wird nur sie gespeichert */
+        bool any = false;
+        for (int b = 0; b < KP_FX_BUTTONS; b++) if (s.rig.fx_btn[b]) any = true;
+        if (any) setup_changed();
+        else { kp_store_rig_erase(rig_index()); s.setup_src = KP_SETUP_DEFAULT; }
+    } else {
+        s.setup_src = KP_SETUP_DEFAULT;
+    }
+    notify(KP_CHG_SYSTEM);
+}
+
+void kp_set_brightness(uint8_t pct)
+{
+    if (pct < 5) pct = 5;
+    if (pct > 100) pct = 100;
+    kp_hw_set_brightness(pct);
+    global_save();
+}
 
 /* ------------------------------------------------------------------------
  * Grundfunktionen
@@ -349,9 +486,11 @@ void kp_init(void)
     s.fs_mode = KP_FS_MODE_FX;      /* unten stehen die Effect Buttons, nicht die Rigs */
     s.bank_known = s.slot_known = true;
     for (uint8_t i = 0; i < KP_FX_BUTTONS; i++)
-        s.fs_assign[i] = (kp_fs_assign_t){ KP_FSA_FX_BUTTON, i };
-    s.fs_assign[4] = (kp_fs_assign_t){ KP_FSA_TAP, 0 };
-    s.fs_assign[5] = (kp_fs_assign_t){ KP_FSA_NONE, 0 };
+        s.fs_default[i] = (kp_fs_assign_t){ KP_FSA_FX_BUTTON, i };
+    s.fs_default[4] = (kp_fs_assign_t){ KP_FSA_TAP, 0 };
+    s.fs_default[5] = (kp_fs_assign_t){ KP_FSA_NONE, 0 };
+    memcpy(s.fs_assign, s.fs_default, sizeof(s.fs_assign));
+    s.setup_src = KP_SETUP_DEFAULT;
     rig_clear(&s.rig);
     for (int i = 0; i < KP_P_COUNT; i++) s.global[i] = PARAMS[i].def;
     s.tuner_ref = 440;
@@ -382,6 +521,7 @@ void kp_set_level(kp_level_t level)
             if (!kp_module_available((kp_mod_t)m)) s.rig.fx_btn[b] &= (uint8_t)~(1u << m);
     }
     if (s.bank >= kp_bank_count()) kp_select_rig(0, 0);
+    global_save();
     notify(KP_CHG_ALL);
 }
 
@@ -518,6 +658,7 @@ void kp_select_rig(uint8_t bank, uint8_t slot)
      * Details des neuen Rigs liefert der Kemper (kp_rx_*). */
     rig_clear(&s.rig);
     copy_name(s.rig.name, s_names[bank][slot]);
+    setup_load();
     s.tap_n = 0;
     kp_link_load_rig(bank, slot);
     notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);
@@ -594,7 +735,12 @@ void kp_module_set_type(kp_mod_t m, uint16_t type)
     md->type = type;
     md->on = type != 0;                        /* neuer Effekt ist an, leer ist aus */
     if (!type) {
-        for (int b = 0; b < KP_FX_BUTTONS; b++) s.rig.fx_btn[b] &= (uint8_t)~(1u << m);
+        bool had = false;
+        for (int b = 0; b < KP_FX_BUTTONS; b++) {
+            if (s.rig.fx_btn[b] & (1u << m)) had = true;
+            s.rig.fx_btn[b] &= (uint8_t)~(1u << m);
+        }
+        if (had) setup_changed();
     }
     mark_edited();
     kp_link_module_type(m, type);
@@ -606,7 +752,7 @@ void kp_fx_button_assign(uint8_t btn, kp_mod_t m, bool assigned)
     if (btn >= KP_FX_BUTTONS || m >= KP_MOD_COUNT) return;
     if (assigned) s.rig.fx_btn[btn] |= (uint8_t)(1u << m);
     else          s.rig.fx_btn[btn] &= (uint8_t)~(1u << m);
-    mark_edited();
+    setup_changed();                   /* gehoert dem Display, nicht dem Kemper-Rig */
     notify(KP_CHG_MODULES | KP_CHG_RIG);
 }
 
@@ -776,12 +922,14 @@ void kp_tuner_set_reference(uint16_t hz)
     if (hz < 424) hz = 424;
     if (hz > 456) hz = 456;
     s.tuner_ref = hz;
+    global_save();
     notify(KP_CHG_TUNER);
 }
 
 void kp_tuner_set_mute(bool mute)
 {
     s.tuner_mute = mute;
+    global_save();
     notify(KP_CHG_TUNER);
 }
 
@@ -806,8 +954,9 @@ kp_fs_assign_t kp_fs_assign(uint8_t idx)
 
 void kp_fs_set_assign(uint8_t idx, kp_fs_assign_t a)
 {
-    if (idx >= KP_FOOTSWITCHES) return;
+    if (idx >= KP_FOOTSWITCHES || !assign_valid(a)) return;
     s.fs_assign[idx] = a;
+    setup_changed();
     notify(KP_CHG_SYSTEM);
 }
 
@@ -933,7 +1082,8 @@ void kp_rx_rig_loaded(uint8_t bank, uint8_t slot)
     s.bank_known = s.slot_known = true;
     rig_clear(&s.rig);
     copy_name(s.rig.name, s_names[bank][slot]);
-    notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);
+    setup_load();
+    notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO | KP_CHG_SYSTEM);
 }
 
 void kp_rx_rig_position(uint8_t bank, uint8_t slot)
@@ -943,7 +1093,11 @@ void kp_rx_rig_position(uint8_t bank, uint8_t slot)
     s.slot = slot;
     s.bank_known = s.slot_known = true;
     if (s.rig.name[0] && !s.rig.edited) copy_name(s_names[bank][slot], s.rig.name);
-    notify(KP_CHG_RIG | KP_CHG_NAMES);
+    /* Am Display schon geaendert: jetzt fuer diesen Platz speichern,
+     * sonst die gespeicherte Belegung laden */
+    if (s.setup_src == KP_SETUP_PENDING) setup_changed();
+    else                                 setup_load();
+    notify(KP_CHG_RIG | KP_CHG_NAMES | KP_CHG_MODULES | KP_CHG_SYSTEM);
 }
 
 void kp_rx_bank(uint8_t bank)
@@ -958,6 +1112,7 @@ void kp_rx_rig_changed(const char * name)
 {
     rig_clear(&s.rig);
     s.bank_known = s.slot_known = false;
+    setup_load();                        /* Platz unbekannt: Standard */
     copy_name(s.rig.name, name);
     s.tap_n = 0;
     notify(KP_CHG_RIG | KP_CHG_MODULES | KP_CHG_PARAMS | KP_CHG_TEMPO);

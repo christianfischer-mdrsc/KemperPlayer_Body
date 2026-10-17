@@ -85,7 +85,7 @@ Die Oberfläche bildet nur den **Kemper Profiler Player** ab: Banks mit je 5 Rig
 | Ansicht | Was funktioniert |
 |---|---|
 | **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht. Signalweg mit allen Effekten als Kacheln: antippen → ein/aus, **halten → Einstellungen** (Module: Werte live vom Kemper; Fixed Effects: Werte **einstellbar** per Regler und −/+). Transpose antippen → ein/aus, halten → Tonhöhe in Halbtönen (−36…+36). Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
-| **Footswitch-Leiste** | Antippen = Footswitch drücken, **halten = Belegung wählen**: jeder FS1–FS6 frei mit Effect Button I–IIII, einem Effekt-Modul, einem Fixed Effect, Tap Tempo oder nichts. Standard: FS1–4 = Effect Button I–IIII, FS5 = Tap, FS6 frei |
+| **Footswitch-Leiste** | Antippen = Footswitch drücken, **halten = Belegung wählen**: jeder FS1–FS6 frei mit Effect Button I–IIII, einem Effekt-Modul, einem Fixed Effect, Tap Tempo oder nichts. Die Belegung gilt **pro Rig-Platz** (Bank/Rig) und wird auf der SD-Karte gespeichert; Rigs ohne eigene Belegung nutzen den Standard (im Dialog „Als Standard“ / „Standard verwenden“). Werksstandard: FS1–4 = Effect Button I–IIII, FS5 = Tap, FS6 frei |
 | **Bearbeiten** | Startseite (Haus-Symbol), Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons, Einstellungen; Modul halten → Einstellungen; Fixed Effects wie in Live; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
 | **Banks** | Banks seitenweise (je 10), Rig antippen → laden |
 | **Tuner** | Referenz 424–456 Hz, Stummschaltung; Ton und Abweichung kommen vom Kemper |
@@ -93,7 +93,22 @@ Die Oberfläche bildet nur den **Kemper Profiler Player** ab: Banks mit je 5 Rig
 
 Signalkette je Ausbaustufe: Level I/II `A, B | Stack | DLY, REV` mit 10 Banks; Level III `A, B, C, D | Stack | X, MOD, DLY, REV` mit 125 Banks.
 
-**Hinweise:** Die eingebauten LVGL-Fonts enthalten keine Umlaute, deshalb kommen in der Oberfläche keine vor. Die Wertebereiche der Parameter sind vorläufig und werden bei der MIDI-Anbindung an die Kemper-Werte angeglichen. Einstellungen werden noch nicht dauerhaft gespeichert.
+**Hinweise:** Die eingebauten LVGL-Fonts enthalten keine Umlaute, deshalb kommen in der Oberfläche keine vor. Die Wertebereiche der Parameter sind vorläufig und werden bei der MIDI-Anbindung an die Kemper-Werte angeglichen. Gespeichert wird auf der microSD-Karte (siehe unten).
+
+## Einstellungen auf der SD-Karte
+
+In den microSD-Slot des Riverdi-Boards gehört eine Karte mit **FAT32** (bis 32 GB; exFAT wird nicht unterstützt). Das Display legt darauf den Ordner `KPD` an:
+
+| Datei | Inhalt |
+|---|---|
+| `KPD/RIGS.BIN` | pro Rig-Platz (Bank × 5 + Rig, bis 625): Footswitch-Belegung FS1–FS6, Zuweisung der Effect Buttons I–IIII zu den Modulen, Rig-Name zur Information |
+| `KPD/SETUP.BIN` | Standardbelegung der Footswitches, Helligkeit, Player-Level, Tuner-Referenz und -Stummschaltung |
+
+- Die Belegung hängt am **Platz**, nicht am Namen: Wer Rigs im Rig Manager umsortiert, nimmt die Belegung nicht mit.
+- Nach dem Anstecken an den Kemper ist der Platz erst bekannt, wenn der Kemper ihn meldet. Eine Änderung in dieser Zeit wird gespeichert, sobald er bekannt ist.
+- Geschrieben wird kurz nach einer Änderung (0,8 s). Die Karte kann im Betrieb gesteckt und gezogen werden; beim Stecken lädt das Display die Einstellungen neu. Ohne Karte gilt alles nur bis zum Ausschalten.
+- Zustand: *System* → **Speicher**.
+- Technik (`CM7/UI/kp_storage.c`): eigener FatFs-Treiber im Polling-Betrieb mit Hardware-Flusssteuerung (der von CubeMX erzeugte DMA-Treiber wird beim Einbinden ersetzt, damit es keine Cache-Probleme gibt), SD-Takt 20 MHz. Wer das Projekt mit CubeMX neu erzeugt, muss nichts anpassen.
 
 ## Footswitches anschließen
 
@@ -159,6 +174,7 @@ firmware/                     STM32CubeIDE-Projekt (Basis: LVGL-Riverdi-Port)
 │   ├── ui_tuner.c            Tuner
 │   ├── ui_settings.c         System (Level, Footswitch-Modus, Helligkeit, Kemper-Verbindung, Uhr, Info)
 │   ├── ui_statusbar.c / .h   Statusleiste: USB-Status, Datum, Uhrzeit
+│   ├── kp_storage.c / .h     Einstellungen auf der microSD-Karte (FatFs)
 │   └── xml/                  Frühere Ansichten als LVGL-XML (veraltet, nur Referenz)
 ├── CM7/USB/                  Verbindung zum Kemper
 │   ├── usbd_conf.c / .h      USB-Gerät auf USB_OTG_HS (internes FS-PHY), FIFOs
@@ -184,10 +200,10 @@ docs/                         Konzept, Einkaufsliste, Kemper-Protokoll, Bilder
 - [ ] kp_link_* / kp_rx_* vollständig mit USB-MIDI füllen (Rig laden, Effekte, Tuner, Bank/Slot) – bisher: Verbindung, Rig 1, Amp/Cab, Tempo
 - [x] Footswitches über den 40-Pin-Header
 - [ ] LED-Ringe (SK6812) an den Footswitches
-- [ ] Fonts mit Umlauten, Einstellungen dauerhaft speichern
+- [ ] Fonts mit Umlauten
+- [x] Einstellungen auf der SD-Karte speichern (FS-Belegung pro Rig, global)
 - [x] Startseite
 - [ ] Setlist-Bereich und Setlist Manager
-- [ ] Footswitch-Belegung dauerhaft speichern
 
 Mehr zum Konzept in [`docs/konzept.md`](docs/konzept.md).
 
