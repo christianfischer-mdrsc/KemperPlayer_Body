@@ -70,9 +70,9 @@ Die Oberfläche bildet nur den **Kemper Profiler Player** ab: Banks mit je 5 Rig
 
 | Ansicht | Was funktioniert |
 |---|---|
-| **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht, Effektmodul antippen → ein/aus, Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
+| **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht, Effektmodul antippen → ein/aus, **halten → Einstellungen** (Werte live vom Kemper), Fixed Effects (6 nach Input, 2 vor Output) antippen → ein/aus, halten → Werte, Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
 | **Footswitch-Leiste** | Modus *Rigs*: FS1–5 = Rig 1–5, FS6 → Effekte. Modus *Effekte*: FS1–4 = Effect Button I–IIII, FS5 = Tap, FS6 → Rigs |
-| **Bearbeiten** | Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
+| **Bearbeiten** | Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons, Einstellungen; Modul halten → Einstellungen; Fixed Effects wie in Live; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
 | **Banks** | Banks seitenweise (je 10), Rig antippen → laden |
 | **Tuner** | Referenz 424–456 Hz, Stummschaltung; Ton und Abweichung kommen vom Kemper |
 | **System** | Player-Level I/II/III, Footswitch-Modus, **Helligkeit** (PWM), **Uhr stellen** (RTC), Info |

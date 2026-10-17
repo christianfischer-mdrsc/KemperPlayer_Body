@@ -5,7 +5,8 @@
  *  - Bereiche RIG, INPUT, AMP, EQ, CAB, OUTPUT (Parameter-Dialoge),
  *    SYSTEM und TUNER (eigene Ansichten)
  *  - Effektkette: Antippen oeffnet das Modul (Effekttyp, Ein/Aus,
- *    Zuweisung zu den Effect Buttons I-IIII)
+ *    Zuweisung zu den Effect Buttons I-IIII), Halten zeigt die Einstellungen
+ *  - Fixed Effects: Antippen = ein/aus, Halten = Werte
  *  - Rig umbenennen, Morph, Tempo
  */
 #include "ui_common.h"
@@ -24,6 +25,7 @@ static struct {
     lv_obj_t * bpm;
     lv_obj_t * tempo_sw;
     ui_chain_t chain;
+    ui_fixed_row_t fixed;
     ui_fsbar_t fs;
 } w;
 
@@ -35,7 +37,8 @@ static struct {
     lv_obj_t * cur;
     lv_obj_t * sw;
     lv_obj_t * fxb[KP_FX_BUTTONS];
-    lv_obj_t * types[40];
+    lv_obj_t * types[128];
+    uint16_t   type_id[128];
     uint8_t    ntypes;
 } md;
 
@@ -45,11 +48,10 @@ static void module_dialog_refresh(uint32_t chg)
 {
     (void)chg;
     const kp_module_t * m = &kp_rig()->mod[md.mod];
-    const kp_effect_t * fx = kp_effect(m->type);
 
-    lv_label_set_text(md.cur, m->type ? fx->name : "leer");
+    lv_label_set_text(md.cur, m->type ? kp_module_fx_name(md.mod) : "leer");
     lv_obj_set_style_text_color(md.cur,
-        lv_color_hex(m->type ? kp_cat_color(fx->cat) : UI_COL_TEXT3), 0);
+        lv_color_hex(m->type ? kp_cat_color(kp_effect_cat(m->type)) : UI_COL_TEXT3), 0);
 
     if (m->on) lv_obj_add_state(md.sw, LV_STATE_CHECKED);
     else       lv_obj_remove_state(md.sw, LV_STATE_CHECKED);
@@ -61,7 +63,7 @@ static void module_dialog_refresh(uint32_t chg)
         if (m->type) lv_obj_remove_state(md.fxb[b], LV_STATE_DISABLED);
         else         lv_obj_add_state(md.fxb[b], LV_STATE_DISABLED);
     }
-    for (uint8_t t = 0; t < md.ntypes; t++) ui_button_set_selected(md.types[t], t == m->type);
+    for (uint8_t t = 0; t < md.ntypes; t++) ui_button_set_selected(md.types[t], md.type_id[t] == m->type);
 }
 
 static void md_switch_cb(lv_event_t * e)
@@ -79,7 +81,13 @@ static void md_fxb_cb(lv_event_t * e)
 
 static void md_type_cb(lv_event_t * e)
 {
-    kp_module_set_type(md.mod, (uint8_t)(uintptr_t)lv_event_get_user_data(e));
+    kp_module_set_type(md.mod, (uint16_t)(uintptr_t)lv_event_get_user_data(e));
+}
+
+static void md_settings_cb(lv_event_t * e)
+{
+    (void)e;
+    ui_fx_dialog(md.mod);
 }
 
 static void module_dialog(kp_mod_t m)
@@ -95,6 +103,8 @@ static void module_dialog(kp_mod_t m)
     ui_label(r1, "Effekt", UI_COL_TEXT3, &lv_font_montserrat_16);
     md.cur = ui_label(r1, "", UI_COL_TEXT, &lv_font_montserrat_24);
     ui_spacer(r1, 1, 1, true);
+    lv_obj_t * set = ui_button(r1, "Einstellungen", &lv_font_montserrat_16, false);
+    lv_obj_add_event_cb(set, md_settings_cb, LV_EVENT_CLICKED, NULL);
     ui_label(r1, "Ein / Aus", UI_COL_TEXT3, &lv_font_montserrat_16);
     md.sw = lv_switch_create(r1);
     lv_obj_set_size(md.sw, 70, 36);
@@ -112,22 +122,25 @@ static void module_dialog(kp_mod_t m)
     }
     ui_label(r2, "schaltet dieses Modul mit", UI_COL_TEXT3, &lv_font_montserrat_14);
 
-    /* Effekttypen, nach Kategorie sortiert */
+    /* Effekttypen (Level I/II: Grundauswahl, Level III: alle) */
     ui_label(c, "Effekttyp", UI_COL_TEXT3, &lv_font_montserrat_16);
     lv_obj_t * grid = ui_row(c, 8);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_style_pad_row(grid, 8, 0);
-    md.ntypes = kp_effect_count();
-    if (md.ntypes > 40) md.ntypes = 40;
-    for (uint8_t t = 0; t < md.ntypes; t++) {
-        const kp_effect_t * fx = kp_effect(t);
+    md.ntypes = 0;
+    const uint16_t cur = kp_rig()->mod[m].type;
+    for (uint8_t t = 0; t < kp_effect_count() && md.ntypes < 128; t++) {
+        const kp_effect_t * fx = kp_effect_at(t);
+        if (!fx->basic && kp_level() != KP_LEVEL_3 && fx->id != cur) continue;
         lv_obj_t * b = ui_button(grid, fx->name, &lv_font_montserrat_16, false);
         lv_obj_set_size(b, 202, 46);
         lv_obj_set_style_border_side(b, LV_BORDER_SIDE_LEFT, 0);
         lv_obj_set_style_border_width(b, 5, 0);
         lv_obj_set_style_border_color(b, lv_color_hex(kp_cat_color(fx->cat)), 0);
-        lv_obj_add_event_cb(b, md_type_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)t);
-        md.types[t] = b;
+        lv_obj_add_event_cb(b, md_type_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)fx->id);
+        md.types[md.ntypes] = b;
+        md.type_id[md.ntypes] = fx->id;
+        md.ntypes++;
     }
 
     module_dialog_refresh(KP_CHG_ALL);
@@ -233,6 +246,7 @@ static void refresh(uint32_t chg)
 {
     if (chg & (KP_CHG_RIG | KP_CHG_NAMES)) update_rig();
     if (chg & (KP_CHG_MODULES | KP_CHG_RIG)) ui_chain_update(&w.chain);
+    if (chg & (KP_CHG_FIXED | KP_CHG_SYSTEM)) ui_fixed_update(&w.fixed);
     if (chg & (KP_CHG_PARAMS | KP_CHG_RIG)) update_params();
     if (chg & (KP_CHG_TEMPO | KP_CHG_RIG)) update_tempo();
     ui_fsbar_update(&w.fs);
@@ -264,6 +278,12 @@ static void tile_cb(lv_event_t * e)
     uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
     if (w.chain.id[i] == KP_CHAIN_STACK) ui_param_dialog(KP_SEC_AMP);
     else                                 module_dialog((kp_mod_t)w.chain.id[i]);
+}
+
+static void tile_long_cb(lv_event_t * e)
+{
+    uint8_t i = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    if (w.chain.id[i] != KP_CHAIN_STACK) ui_fx_dialog((kp_mod_t)w.chain.id[i]);
 }
 
 /* Bereiche oben rechts */
@@ -338,7 +358,8 @@ lv_obj_t * ui_edit_build(void)
     lv_obj_set_style_pad_left(w.stack, 12, 0);
 
     ui_spacer(body, LV_PCT(100), 1, true);
-    ui_chain_create(&w.chain, body, true, tile_cb);
+    ui_fixed_create(&w.fixed, body);
+    ui_chain_create(&w.chain, body, true, tile_cb, tile_long_cb);
 
     /* Morph und Tempo */
     lv_obj_t * mr = ui_row(body, 12);

@@ -2,9 +2,11 @@
  * @file ui_common.c
  * Gemeinsame Bausteine aller Ansichten (siehe ui_common.h).
  */
+#include <string.h>
 #include "ui_common.h"
 #include "ui_statusbar.h"
 #include "ui_screens.h"
+#include "kemper_link.h"
 
 #define COL_PRESSED   0x2a2d31
 #define COL_DIM       0x5a5f66
@@ -62,11 +64,12 @@ void ui_theme_init(void)
 /* ------------------------------------------------------------------------
  * Navigation
  * --------------------------------------------------------------------- */
-static ui_scr_t   s_cur = UI_SCR_LIVE;
-static ui_scr_t   s_prev = UI_SCR_LIVE;
+static ui_scr_t   s_cur = UI_SCR_HOME;
+static ui_scr_t   s_prev = UI_SCR_HOME;
 static lv_obj_t * s_refresh_owner;
 static void     (*s_refresh)(uint32_t);
 static void     (*s_dialog_refresh)(uint32_t);
+static void     (*s_dialog_close)(void);
 
 static void on_model(uint32_t chg)
 {
@@ -103,6 +106,7 @@ lv_obj_t * ui_nav_build(ui_scr_t scr)
     case UI_SCR_BANKS:    return ui_banks_build();
     case UI_SCR_TUNER:    return ui_tuner_build();
     case UI_SCR_SETTINGS: return ui_settings_build();
+    case UI_SCR_HOME:     return ui_home_build();
     case UI_SCR_LIVE:
     default:              return ui_live_build();
     }
@@ -300,7 +304,8 @@ lv_obj_t * ui_title_bar(lv_obj_t * body, const char * title, ui_scr_t back_to)
 /* ------------------------------------------------------------------------
  * Effektkette
  * --------------------------------------------------------------------- */
-void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact, lv_event_cb_t cb)
+void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact,
+                     lv_event_cb_t cb, lv_event_cb_t long_cb)
 {
     lv_obj_t * row = ui_row(parent, 6);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -316,7 +321,9 @@ void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact, lv_event_c
         lv_obj_set_style_border_width(t, 2, 0);
         lv_obj_set_style_pad_all(t, 8, 0);
         lv_obj_set_style_pad_row(t, compact ? 4 : 6, 0);
-        if (cb) lv_obj_add_event_cb(t, cb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+        /* SHORT_CLICKED kommt nur, wenn nicht lange gedrueckt wurde */
+        if (cb) lv_obj_add_event_cb(t, cb, LV_EVENT_SHORT_CLICKED, (void *)(uintptr_t)i);
+        if (long_cb) lv_obj_add_event_cb(t, long_cb, LV_EVENT_LONG_PRESSED, (void *)(uintptr_t)i);
 
         c->tile[i]  = t;
         c->slot[i]  = ui_label(t, "", UI_COL_TEXT3,
@@ -351,15 +358,14 @@ void ui_chain_update(ui_chain_t * c)
             lv_obj_set_width(c->state[i], LV_PCT(100));
         } else {
             const kp_module_t * m = &r->mod[c->id[i]];
-            const kp_effect_t * fx = kp_effect(m->type);
-            uint32_t cc = kp_cat_color(fx->cat);
+            uint32_t cc = kp_cat_color(kp_effect_cat(m->type));
             lv_label_set_text(c->slot[i], kp_module_name((kp_mod_t)c->id[i]));
             if (!m->type) {
                 name = "leer";
                 state = "";
                 ncol = COL_DIM;
             } else {
-                name = fx->name;
+                name = kp_module_fx_name((kp_mod_t)c->id[i]);
                 state = m->on ? "ON" : "OFF";
                 if (m->on) { border = cc; scol = cc; }
                 else       { ncol = UI_COL_TEXT3; }
@@ -371,6 +377,72 @@ void ui_chain_update(ui_chain_t * c)
         lv_obj_set_style_text_color(c->slot[i], lv_color_hex(scol), 0);
         lv_obj_set_style_text_color(c->state[i], lv_color_hex(scol), 0);
         lv_obj_set_style_text_color(c->name[i], lv_color_hex(ncol), 0);
+    }
+}
+
+/* ------------------------------------------------------------------------
+ * Fixed Effects
+ * --------------------------------------------------------------------- */
+static const char * const FIX_SHORT[KP_FIX_COUNT] = {
+    "Transpose", "Gate", "Comp", "Boost", "Wah", "Chorus", "Air Chorus", "Doubler"
+};
+
+static void fixed_cb(lv_event_t * e)
+{
+    kp_fixed_toggle((kp_fixed_t)(uintptr_t)lv_event_get_user_data(e));
+}
+
+static void fixed_long_cb(lv_event_t * e)
+{
+    ui_fixed_dialog((kp_fixed_t)(uintptr_t)lv_event_get_user_data(e));
+}
+
+static void fixed_chip(ui_fixed_row_t * f, lv_obj_t * row, kp_fixed_t i)
+{
+    lv_obj_t * b = btn_base(row, false);
+    lv_obj_set_size(b, LV_SIZE_CONTENT, 40);
+    lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_hor(b, 10, 0);
+    lv_obj_set_style_pad_column(b, 7, 0);
+    lv_obj_set_style_radius(b, 8, 0);
+    lv_obj_set_style_border_width(b, 2, 0);
+    lv_obj_add_event_cb(b, fixed_cb, LV_EVENT_SHORT_CLICKED, (void *)(uintptr_t)i);
+    lv_obj_add_event_cb(b, fixed_long_cb, LV_EVENT_LONG_PRESSED, (void *)(uintptr_t)i);
+
+    lv_obj_t * led = lv_obj_create(b);
+    lv_obj_remove_style_all(led);
+    lv_obj_set_size(led, 9, 9);
+    lv_obj_set_style_radius(led, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(led, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(led, LV_OBJ_FLAG_CLICKABLE);
+
+    f->chip[i] = b;
+    f->led[i] = led;
+    f->txt[i] = ui_label(b, FIX_SHORT[i], UI_COL_TEXT3, &lv_font_montserrat_14);
+}
+
+void ui_fixed_create(ui_fixed_row_t * f, lv_obj_t * parent)
+{
+    lv_obj_t * row = ui_row(parent, 6);
+    ui_label(row, "IN " LV_SYMBOL_RIGHT, UI_COL_TEXT3, &lv_font_montserrat_12);
+    for (int i = 0; i < KP_FIX_INPUT_COUNT; i++) fixed_chip(f, row, (kp_fixed_t)i);
+    ui_spacer(row, 1, 1, true);
+    for (int i = KP_FIX_INPUT_COUNT; i < KP_FIX_COUNT; i++) fixed_chip(f, row, (kp_fixed_t)i);
+    ui_label(row, LV_SYMBOL_RIGHT " OUT", UI_COL_TEXT3, &lv_font_montserrat_12);
+    ui_fixed_update(f);
+}
+
+void ui_fixed_update(ui_fixed_row_t * f)
+{
+    for (int i = 0; i < KP_FIX_COUNT; i++) {
+        const int8_t st = kp_fixed_state((kp_fixed_t)i);
+        const uint32_t cc = kp_cat_color(kp_fixed_cat((kp_fixed_t)i));
+        lv_obj_set_style_border_color(f->chip[i], lv_color_hex(st == 1 ? cc : UI_COL_LINE), 0);
+        lv_obj_set_style_bg_color(f->led[i], lv_color_hex(st == 1 ? cc : (st == 0 ? 0x3a3e44 : UI_COL_TILE)), 0);
+        lv_obj_set_style_border_width(f->led[i], st < 0 ? 1 : 0, 0);
+        lv_obj_set_style_border_color(f->led[i], lv_color_hex(COL_DIM), 0);
+        lv_obj_set_style_text_color(f->txt[i], lv_color_hex(st == 1 ? UI_COL_TEXT : UI_COL_TEXT3), 0);
     }
 }
 
@@ -498,6 +570,11 @@ lv_obj_t * ui_dialog_open(const char * title, int32_t w, int32_t h, lv_obj_t ** 
 void ui_dialog_close(void)
 {
     s_dialog_refresh = NULL;
+    if (s_dialog_close) {
+        void (*fn)(void) = s_dialog_close;
+        s_dialog_close = NULL;
+        fn();
+    }
     if (s_dialog) {
         lv_obj_t * d = s_dialog;
         s_dialog = NULL;
@@ -511,6 +588,11 @@ bool ui_dialog_is_open(void) { return s_dialog != NULL; }
 void ui_dialog_set_refresh(void (*fn)(uint32_t))
 {
     s_dialog_refresh = fn;
+}
+
+void ui_dialog_set_close(void (*fn)(void))
+{
+    s_dialog_close = fn;
 }
 
 /* ---- Parameter-Dialog ------------------------------------------------- */
@@ -574,4 +656,123 @@ void ui_param_dialog(kp_section_t sec)
     ui_spacer(foot, 1, 1, true);
     lv_obj_t * rst = ui_button(foot, "Standardwerte", &lv_font_montserrat_16, false);
     lv_obj_add_event_cb(rst, param_reset_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)sec);
+}
+
+/* ---- Effekt-Einstellungen (live vom Kemper) --------------------------- */
+static struct {
+    kl_watch_t kind;
+    uint8_t    idx;
+    lv_obj_t * name;
+    lv_obj_t * state;
+    lv_obj_t * item[KL_WATCH_MAX];
+    lv_obj_t * key[KL_WATCH_MAX];
+    lv_obj_t * val[KL_WATCH_MAX];
+    lv_obj_t * msg;
+} fd;
+
+static void fx_dialog_close(void)
+{
+    kemper_link_watch(KL_WATCH_NONE, 0);
+    fd.kind = KL_WATCH_NONE;
+}
+
+static void fx_dialog_refresh(uint32_t chg)
+{
+    (void)chg;
+    static kl_info_t i;
+    kemper_link_get_info(&i);
+
+    /* Kopf: Effekt und Zustand */
+    const char * nm;
+    uint32_t col;
+    int8_t st;
+    bool empty = false;
+    if (fd.kind == KL_WATCH_SLOT) {
+        const kp_module_t * m = &kp_rig()->mod[fd.idx];
+        empty = m->type == 0;
+        nm = empty ? "leer" : kp_module_fx_name((kp_mod_t)fd.idx);
+        col = empty ? UI_COL_TEXT3 : kp_cat_color(kp_effect_cat(m->type));
+        st = empty ? -1 : (m->on ? 1 : 0);
+    } else {
+        nm = kp_fixed_name((kp_fixed_t)fd.idx);
+        col = kp_cat_color(kp_fixed_cat((kp_fixed_t)fd.idx));
+        st = kp_fixed_state((kp_fixed_t)fd.idx);
+    }
+    lv_label_set_text(fd.name, nm);
+    lv_obj_set_style_text_color(fd.name, lv_color_hex(col), 0);
+    lv_label_set_text(fd.state, st == 1 ? "EIN" : (st == 0 ? "AUS" : ""));
+    lv_obj_set_style_text_color(fd.state, lv_color_hex(st == 1 ? col : UI_COL_TEXT3), 0);
+
+    /* Werte */
+    const bool mine = i.watch_kind == (uint8_t)fd.kind && i.watch_idx == fd.idx;
+    const uint8_t n = mine ? i.watch_n : 0;
+    for (uint8_t k = 0; k < KL_WATCH_MAX; k++) {
+        const bool has = k < n && (i.watch_valid & (1U << k));
+        lv_obj_set_hidden(fd.item[k], k >= n);
+        if (k >= n) continue;
+        lv_label_set_text(fd.key[k], i.watch_name[k] ? i.watch_name[k] : "");
+        lv_label_set_text(fd.val[k], has ? i.watch_txt[k] : "...");
+    }
+
+    if (i.kemper != KL_KEMPER_OK)
+        lv_label_set_text(fd.msg, "Kemper nicht verbunden - die Werte kommen vom Kemper.");
+    else if (empty)
+        lv_label_set_text(fd.msg, "In diesem Slot ist kein Effekt.");
+    else
+        lv_label_set_text(fd.msg, "Werte wie am Kemper angezeigt, laufend aktualisiert.");
+}
+
+static void fx_dialog_open(const char * title, kl_watch_t kind, uint8_t idx)
+{
+    lv_obj_t * c;
+    ui_dialog_open(title, 880, 520, &c);
+    fd.kind = kind;
+    fd.idx = idx;
+
+    lv_obj_t * head = ui_row(c, 16);
+    fd.name = ui_label(head, "", UI_COL_TEXT, &lv_font_montserrat_28);
+    fd.state = ui_label(head, "", UI_COL_TEXT3, &lv_font_montserrat_20);
+
+    lv_obj_t * grid = ui_row(c, 12);
+    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_row(grid, 8, 0);
+    for (uint8_t k = 0; k < KL_WATCH_MAX; k++) {
+        lv_obj_t * it = ui_panel(grid);
+        lv_obj_set_size(it, 404, 46);
+        lv_obj_set_flex_flow(it, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(it, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_ver(it, 0, 0);
+        lv_obj_set_style_pad_hor(it, 12, 0);
+        lv_obj_set_style_bg_color(it, lv_color_hex(UI_COL_BG), 0);
+        fd.item[k] = it;
+        fd.key[k] = ui_label(it, "", UI_COL_TEXT3, &lv_font_montserrat_16);
+        lv_obj_set_width(fd.key[k], 1);
+        lv_obj_set_flex_grow(fd.key[k], 1);
+        lv_label_set_long_mode(fd.key[k], LV_LABEL_LONG_DOT);
+        fd.val[k] = ui_label(it, "", UI_COL_TEXT, &lv_font_montserrat_20);
+        lv_obj_set_hidden(it, true);
+    }
+    fd.msg = ui_label(c, "", UI_COL_TEXT3, &lv_font_montserrat_14);
+    lv_obj_set_width(fd.msg, LV_PCT(100));
+    lv_label_set_long_mode(fd.msg, LV_LABEL_LONG_WRAP);
+
+    kemper_link_watch(kind, idx);
+    fx_dialog_refresh(KP_CHG_ALL);
+    ui_dialog_set_refresh(fx_dialog_refresh);
+    ui_dialog_set_close(fx_dialog_close);
+}
+
+void ui_fx_dialog(kp_mod_t m)
+{
+    char title[32];
+    if (m >= KP_MOD_COUNT) return;
+    lv_snprintf(title, sizeof(title), "Modul %s - Einstellungen", kp_module_name(m));
+    fx_dialog_open(title, KL_WATCH_SLOT, (uint8_t)m);
+}
+
+void ui_fixed_dialog(kp_fixed_t f)
+{
+    if (f >= KP_FIX_COUNT) return;
+    fx_dialog_open(f < KP_FIX_INPUT_COUNT ? "Fixed Effect (Input)" : "Fixed Effect (Output)",
+                   KL_WATCH_FIXED, (uint8_t)f);
 }

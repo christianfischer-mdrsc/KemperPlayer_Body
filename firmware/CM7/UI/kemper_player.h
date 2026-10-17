@@ -7,6 +7,8 @@
  *  - Signalkette: Level I/II  A, B | Stack | DLY, REV
  *                 Level III   A, B, C, D | Stack | X, MOD, DLY, REV
  *  - Effect Buttons I-IIII (je Rig einem oder mehreren Modulen zugewiesen)
+ *  - Fixed Effects: 6 nach dem Input (Transpose, Gate, Comp, Boost, Wah,
+ *    Chorus), 2 vor dem Output (Air Chorus, Double Tracker)
  *  - Tap Tempo, Tuner, Morph, Rig-/Amp-/EQ-/Cab-Parameter, Output (global)
  *  - keine Performances (gibt es am Player nicht)
  *
@@ -72,18 +74,45 @@ typedef enum {
     KP_CAT_PITCH,        /* weiss  */
     KP_CAT_DELAY,        /* gruen  */
     KP_CAT_REVERB,       /* gruen  */
+    KP_CAT_LOOPER,       /* grau   */
     KP_CAT_COUNT
 } kp_cat_t;
 
+/* Eintrag im Effektkatalog. id ist die Typnummer des Kemper (NRPN-Parameter
+ * "Type" der Stomp-Seiten), 0 = leer. */
 typedef struct {
+    uint16_t     id;
     const char * name;
     kp_cat_t     cat;
+    bool         basic;  /* auch bei Level I/II zur Auswahl angeboten */
 } kp_effect_t;
 
 typedef struct {
-    uint8_t type;        /* Index in den Effektkatalog, 0 = leer */
-    bool    on;
+    uint16_t type;               /* Kemper-Typnummer, 0 = leer */
+    bool     on;
+    char     name[KP_NAME_LEN];  /* Name vom Kemper, "" = Name aus dem Katalog */
 } kp_module_t;
+
+/* Fixed Effects des Players (Reihenfolge = Signalfluss) */
+typedef enum {
+    KP_FIX_TRANSPOSE = 0,
+    KP_FIX_GATE,
+    KP_FIX_COMP,
+    KP_FIX_BOOST,
+    KP_FIX_WAH,
+    KP_FIX_CHORUS,
+    KP_FIX_AIR,                  /* ab hier: vor dem Output */
+    KP_FIX_DOUBLE,
+    KP_FIX_COUNT
+} kp_fixed_t;
+#define KP_FIX_INPUT_COUNT  6    /* KP_FIX_TRANSPOSE .. KP_FIX_CHORUS nach dem Input */
+
+/* Einstellung eines Effekts (NRPN-Nummer auf der Seite des Slots).
+ * Den Wert als Text liefert der Kemper selbst. */
+typedef struct {
+    uint8_t      nr;
+    const char * name;
+} kp_fx_param_t;
 
 /* Einstellbare Parameter, gruppiert wie die Bereiche im Rig Manager */
 typedef enum {
@@ -177,6 +206,7 @@ typedef struct {
 #define KP_CHG_TUNER    (1u << 4)
 #define KP_CHG_SYSTEM   (1u << 5)   /* Level, Verbindung, Footswitch-Modus */
 #define KP_CHG_NAMES    (1u << 6)   /* Rig-Namen in der Bank-Liste */
+#define KP_CHG_FIXED    (1u << 7)   /* Fixed Effects */
 #define KP_CHG_ALL      0xFFFFu
 
 typedef void (*kp_listener_t)(uint32_t changes);
@@ -200,9 +230,14 @@ const char *kp_module_name(kp_mod_t m);         /* "A", "B", ..., "REV" */
 
 /* Effektkatalog */
 uint8_t            kp_effect_count(void);       /* inkl. Eintrag 0 = leer */
-const kp_effect_t *kp_effect(uint8_t type);
+const kp_effect_t *kp_effect_at(uint8_t idx);
+/* Eintrag zur Kemper-Typnummer; unbekannte Nummer: Name der Kategorie */
+const kp_effect_t *kp_effect(uint16_t type);
+kp_cat_t           kp_effect_cat(uint16_t type);
 const char        *kp_cat_name(kp_cat_t c);
 uint32_t           kp_cat_color(kp_cat_t c);
+/* Einstellungen, die zu einem Effekttyp angezeigt werden (const, aus jedem Task) */
+uint8_t            kp_fx_params(uint16_t type, const kp_fx_param_t ** list);
 
 /* Banks und Rigs */
 uint8_t     kp_bank(void);                      /* 0-basiert */
@@ -220,11 +255,24 @@ bool        kp_rig_is_empty(void);
 void        kp_rig_rename(const char * name);
 void        kp_module_toggle(kp_mod_t m);
 void        kp_module_set_on(kp_mod_t m, bool on);
-void        kp_module_set_type(kp_mod_t m, uint8_t type);   /* 0 = leeren */
+void        kp_module_set_type(kp_mod_t m, uint16_t type);  /* 0 = leeren */
+/* Name des Effekts im Modul (vom Kemper, sonst aus dem Katalog) */
+const char *kp_module_fx_name(kp_mod_t m);
 void        kp_fx_button_assign(uint8_t btn, kp_mod_t m, bool assigned);
 bool        kp_fx_button_state(uint8_t btn);    /* true, wenn ein zugewiesenes Modul an ist */
 void        kp_fx_button_press(uint8_t btn);
 void        kp_set_morph(uint8_t pct);
+
+/* Fixed Effects */
+const char *kp_fixed_name(kp_fixed_t f);
+kp_cat_t    kp_fixed_cat(kp_fixed_t f);
+int8_t      kp_fixed_state(kp_fixed_t f);       /* -1 = unbekannt, 0 = aus, 1 = an */
+void        kp_fixed_toggle(kp_fixed_t f);
+/* NRPN-Nummer des Ein/Aus-Schalters (Seite KP_FIXED_PAGE) und die weiteren
+ * Werte des Effekts (const, aus jedem Task) */
+#define     KP_FIXED_PAGE  5
+uint8_t     kp_fixed_nr(kp_fixed_t f);
+uint8_t     kp_fixed_params(kp_fixed_t f, const kp_fx_param_t ** list);
 
 /* Parameter */
 const kp_param_info_t *kp_param_info(kp_param_t p);
@@ -261,7 +309,8 @@ void        kp_footswitch(uint8_t idx, uint32_t now_ms);
  * ------------------------------------------------------------------ */
 void kp_link_load_rig(uint8_t bank, uint8_t slot);
 void kp_link_module_on(kp_mod_t m, bool on);
-void kp_link_module_type(kp_mod_t m, uint8_t type);
+void kp_link_module_type(kp_mod_t m, uint16_t type);
+void kp_link_fixed(kp_fixed_t f, bool on);
 void kp_link_fx_button(uint8_t btn, bool on);
 void kp_link_param(kp_param_t p, int16_t value);
 void kp_link_tap(void);
@@ -277,8 +326,14 @@ void kp_rx_connected(bool connected);
 void kp_rx_level(kp_level_t level);
 void kp_rx_rig_name_at(uint8_t bank, uint8_t slot, const char * name);
 void kp_rx_rig_loaded(uint8_t bank, uint8_t slot);
+/* Am Kemper ist ein anderes Rig geladen, Bank/Platz unbekannt: Details leeren,
+ * Name uebernehmen, Position im Modell bleibt */
+void kp_rx_rig_changed(const char * name);
 void kp_rx_stack(const char * amp, const char * cab);
-void kp_rx_module(kp_mod_t m, uint8_t type, bool on);
+void kp_rx_module_type(kp_mod_t m, uint16_t type);
+void kp_rx_module_on(kp_mod_t m, bool on);
+void kp_rx_module_name(kp_mod_t m, const char * name);
+void kp_rx_fixed(kp_fixed_t f, int8_t state);  /* -1 = unbekannt */
 void kp_rx_param(kp_param_t p, int16_t value);
 void kp_rx_tempo(bool on, uint16_t bpm);
 void kp_rx_tuner(bool signal, const char * note, int8_t cents);

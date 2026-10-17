@@ -12,5 +12,6 @@ lv_obj_t * ui_edit_build(void);      /* ui_edit.c     */
 lv_obj_t * ui_banks_build(void);     /* ui_banks.c    */
 lv_obj_t * ui_tuner_build(void);     /* ui_tuner.c    */
 lv_obj_t * ui_settings_build(void);  /* ui_settings.c */
+lv_obj_t * ui_home_build(void);      /* ui_home.c     */
 
 #endif /* UI_SCREENS_H */

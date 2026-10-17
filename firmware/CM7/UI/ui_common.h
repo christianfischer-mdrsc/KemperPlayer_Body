@@ -1,7 +1,7 @@
 /**
  * @file ui_common.h
  * Gemeinsame Bausteine aller Ansichten: Stile, Navigation, Effektkette,
- * Footswitch-Leiste und Dialoge.
+ * Fixed Effects, Footswitch-Leiste und Dialoge.
  *
  * Es existiert immer nur der gerade angezeigte Screen. Beim Wechsel wird der
  * neue Screen erzeugt und der alte geloescht; alle Werte stehen im Modell
@@ -23,6 +23,7 @@ typedef enum {
     UI_SCR_BANKS,
     UI_SCR_TUNER,
     UI_SCR_SETTINGS,
+    UI_SCR_HOME,
     UI_SCR_COUNT
 } ui_scr_t;
 
@@ -70,9 +71,24 @@ typedef struct {
     bool       compact;
 } ui_chain_t;
 
-/* cb wird beim Antippen einer Kachel aufgerufen, user_data = Kachel-Index */
-void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact, lv_event_cb_t cb);
+/* cb beim kurzen Antippen, long_cb beim Halten einer Kachel (darf NULL sein),
+ * user_data = Kachel-Index */
+void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact,
+                     lv_event_cb_t cb, lv_event_cb_t long_cb);
 void ui_chain_update(ui_chain_t * c);
+
+/* ---------------------------------------------------------------------
+ * Fixed Effects: 6 nach dem Input, 2 vor dem Output.
+ * Antippen = ein/aus, Halten = Werte anzeigen.
+ * ------------------------------------------------------------------ */
+typedef struct {
+    lv_obj_t * chip[KP_FIX_COUNT];
+    lv_obj_t * led[KP_FIX_COUNT];
+    lv_obj_t * txt[KP_FIX_COUNT];
+} ui_fixed_row_t;
+
+void ui_fixed_create(ui_fixed_row_t * f, lv_obj_t * parent);
+void ui_fixed_update(ui_fixed_row_t * f);
 
 /* ---------------------------------------------------------------------
  * Footswitch-Leiste (FS1-FS6, tippen = Taster druecken)
@@ -96,8 +112,13 @@ void       ui_dialog_close(void);
 bool       ui_dialog_is_open(void);
 /* Optionale Aktualisierung des offenen Dialogs bei Modell-Aenderungen */
 void       ui_dialog_set_refresh(void (*fn)(uint32_t changes));
+/* Wird beim Schliessen des offenen Dialogs aufgerufen */
+void       ui_dialog_set_close(void (*fn)(void));
 /* Dialog mit Schiebereglern fuer alle Parameter eines Bereichs */
 void       ui_param_dialog(kp_section_t sec);
+/* Einstellungen eines Effekts bzw. Fixed Effects, live vom Kemper */
+void       ui_fx_dialog(kp_mod_t m);
+void       ui_fixed_dialog(kp_fixed_t f);
 
 #ifdef __cplusplus
 }
