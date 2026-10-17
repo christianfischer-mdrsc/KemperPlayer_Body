@@ -246,7 +246,7 @@ static void update_tempo(void)
 static void refresh(uint32_t chg)
 {
     if (chg & (KP_CHG_RIG | KP_CHG_NAMES)) update_rig();
-    if (chg & (KP_CHG_MODULES | KP_CHG_RIG)) ui_chain_update(&w.chain);
+    if (chg & (KP_CHG_MODULES | KP_CHG_RIG | KP_CHG_SYSTEM)) ui_chain_update(&w.chain);
     if (chg & (KP_CHG_FIXED | KP_CHG_SYSTEM)) ui_fixed_update(&w.fixed);
     if (chg & (KP_CHG_PARAMS | KP_CHG_RIG)) update_params();
     if (chg & (KP_CHG_TEMPO | KP_CHG_RIG)) update_tempo();

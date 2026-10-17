@@ -184,6 +184,10 @@ static const char * const FIX_NAME[KP_FIX_COUNT] = {
     "Transpose", "Noise Gate", "Compressor", "Pure Booster", "Wah Wah", "Vintage Chorus",
     "Air Chorus", "Double Tracker"
 };
+/* Kurznamen wie auf den Kacheln der Live-Ansicht */
+static const char * const FIX_TAG[KP_FIX_COUNT] = {
+    "TRANSP", "GATE", "COMP", "BOOST", "WAH", "CHORUS", "AIR", "DOUBLE"
+};
 static const kp_cat_t FIX_CAT[KP_FIX_COUNT] = {
     KP_CAT_PITCH, KP_CAT_GATE, KP_CAT_COMP, KP_CAT_BOOST, KP_CAT_WAH, KP_CAT_CHORUS,
     KP_CAT_CHORUS, KP_CAT_EQ
@@ -960,6 +964,35 @@ void kp_fs_set_assign(uint8_t idx, kp_fs_assign_t a)
     notify(KP_CHG_SYSTEM);
 }
 
+uint8_t kp_fs_mask_module(kp_mod_t m)
+{
+    uint8_t mask = 0;
+    if (m >= KP_MOD_COUNT) return 0;
+    for (uint8_t i = 0; i < KP_FOOTSWITCHES; i++) {
+        const kp_fs_assign_t a = s.fs_assign[i];
+        if ((a.kind == KP_FSA_MODULE && a.idx == m) ||
+            (a.kind == KP_FSA_FX_BUTTON && (s.rig.fx_btn[a.idx] & (1u << m))))
+            mask |= (uint8_t)(1u << i);
+    }
+    return mask;
+}
+
+uint8_t kp_fs_mask_fixed(kp_fixed_t f)
+{
+    uint8_t mask = 0;
+    for (uint8_t i = 0; i < KP_FOOTSWITCHES; i++)
+        if (s.fs_assign[i].kind == KP_FSA_FIXED && s.fs_assign[i].idx == f) mask |= (uint8_t)(1u << i);
+    return mask;
+}
+
+uint8_t kp_fs_mask_tap(void)
+{
+    uint8_t mask = 0;
+    for (uint8_t i = 0; i < KP_FOOTSWITCHES; i++)
+        if (s.fs_assign[i].kind == KP_FSA_TAP) mask |= (uint8_t)(1u << i);
+    return mask;
+}
+
 const char * kp_fs_assign_name(kp_fs_assign_t a)
 {
     static const char * const BTN[KP_FX_BUTTONS] = {
@@ -989,16 +1022,23 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
         uint8_t mask = s.rig.fx_btn[a.idx];
         char buf[KP_NAME_LEN] = "";
         uint32_t col = 0;
+        uint8_t n = 0, first = 0;
         for (int m = 0; m < KP_MOD_COUNT; m++) {
             if (!(mask & (1u << m))) continue;
+            if (!n++) first = (uint8_t)m;
             if (buf[0]) strncat(buf, " + ", sizeof(buf) - strlen(buf) - 1);
             strncat(buf, MOD_NAME[m], sizeof(buf) - strlen(buf) - 1);
             if (!col && s.rig.mod[m].type) col = CAT_COLOR[kp_effect_cat(s.rig.mod[m].type)];
         }
-        copy_name(o->main, buf[0] ? buf : "nicht belegt");
+        /* ein Modul: dessen Effektname, mehrere: die Module */
+        if (n == 1 && s.rig.mod[first].type) copy_name(o->main, kp_module_fx_name((kp_mod_t)first));
+        else                                 copy_name(o->main, buf[0] ? buf : "nicht belegt");
+        if (n == 1) snprintf(o->tag, sizeof(o->tag), "%s", MOD_NAME[first]);
+        else if (n > 1) snprintf(o->tag, sizeof(o->tag), "%s+", MOD_NAME[first]);
         o->empty = mask == 0;
         snprintf(o->sub, sizeof(o->sub), "Effect Button %s", FX_BTN_NAME[a.idx]);
         o->active = kp_fx_button_state(a.idx);
+        o->color = col;
         o->led = o->active ? col : 0;
         break;
     }
@@ -1009,7 +1049,9 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
         snprintf(o->sub, sizeof(o->sub), "Modul %s", MOD_NAME[a.idx]);
         o->empty = !avail || !m->type;
         o->active = !o->empty && m->on;
-        o->led = o->active ? CAT_COLOR[kp_effect_cat(m->type)] : 0;
+        o->color = o->empty ? 0 : CAT_COLOR[kp_effect_cat(m->type)];
+        o->led = o->active ? o->color : 0;
+        snprintf(o->tag, sizeof(o->tag), "%s", MOD_NAME[a.idx]);
         break;
     }
     case KP_FSA_FIXED:
@@ -1017,7 +1059,9 @@ void kp_fs_info(uint8_t idx, kp_fs_info_t * o)
         snprintf(o->sub, sizeof(o->sub), "%s", s.fixed[a.idx] < 0 ? "Fixed Effect" :
                  (s.fixed[a.idx] ? "Fixed Effect: an" : "Fixed Effect: aus"));
         o->active = s.fixed[a.idx] == 1;
-        o->led = o->active ? CAT_COLOR[FIX_CAT[a.idx]] : 0;
+        o->color = CAT_COLOR[FIX_CAT[a.idx]];
+        o->led = o->active ? o->color : 0;
+        snprintf(o->tag, sizeof(o->tag), "%s", FIX_TAG[a.idx]);
         break;
     case KP_FSA_TAP:
         copy_name(o->main, "TAP");

@@ -57,6 +57,10 @@ lv_obj_t * ui_slider(lv_obj_t * parent, int32_t min, int32_t max, int32_t value)
 lv_obj_t * ui_bank_chip(lv_obj_t * parent, lv_obj_t ** label_out, lv_obj_t ** dot_out);
 void       ui_bank_chip_update(lv_obj_t * label, lv_obj_t * dot);
 lv_obj_t * ui_title_bar(lv_obj_t * body, const char * title, ui_scr_t back_to);
+/* Schild "FS3" bzw. "FS1+3": welche Footswitches etwas schalten (mask: Bit 0 = FS1).
+ * Unten rechts im parent, ausserhalb des Layouts; mask 0 = versteckt. */
+lv_obj_t * ui_fs_badge(lv_obj_t * parent);
+void       ui_fs_badge_set(lv_obj_t * badge, uint8_t mask);
 
 /* ---------------------------------------------------------------------
  * Effektkette (Kacheln A, B, ... STACK ... DLY, REV)
@@ -68,6 +72,7 @@ typedef struct {
     lv_obj_t * slot[KP_CHAIN_MAX];
     lv_obj_t * name[KP_CHAIN_MAX];
     lv_obj_t * state[KP_CHAIN_MAX];
+    lv_obj_t * fs[KP_CHAIN_MAX];
     bool       compact;
 } ui_chain_t;
 
@@ -94,9 +99,11 @@ typedef struct {
     lv_obj_t * slot[UI_PATH_MAX];
     lv_obj_t * name[UI_PATH_MAX];
     lv_obj_t * state[UI_PATH_MAX];
+    lv_obj_t * fs[UI_PATH_MAX];        /* Schild "FSn" */
     lv_obj_t * tr;                     /* Transpose */
     lv_obj_t * tr_led;
     lv_obj_t * tr_val;
+    lv_obj_t * tr_fs;
     lv_point_precise_t pts[6];         /* Linie (muss bestehen bleiben) */
     bool       narrow;                 /* schmale Kacheln (viele Module) */
 } ui_path_t;
@@ -112,6 +119,7 @@ typedef struct {
     lv_obj_t * chip[KP_FIX_COUNT];
     lv_obj_t * led[KP_FIX_COUNT];
     lv_obj_t * txt[KP_FIX_COUNT];
+    lv_obj_t * fs[KP_FIX_COUNT];
 } ui_fixed_row_t;
 
 void ui_fixed_create(ui_fixed_row_t * f, lv_obj_t * parent);
@@ -126,6 +134,7 @@ typedef struct {
     lv_obj_t * main[KP_FOOTSWITCHES];
     lv_obj_t * sub[KP_FOOTSWITCHES];
     lv_obj_t * led[KP_FOOTSWITCHES];
+    lv_obj_t * stripe[KP_FOOTSWITCHES];   /* Farbe des geschalteten Effekts */
 } ui_fsbar_t;
 
 /* Antippen = Footswitch druecken, Halten = Belegung waehlen */

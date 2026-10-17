@@ -20,6 +20,7 @@ static struct {
     lv_obj_t * edited;
     lv_obj_t * bpm;
     lv_obj_t * bpm_led;
+    lv_obj_t * bpm_fs;
     lv_obj_t * slot;
     lv_obj_t * rig;
     ui_path_t  path;
@@ -33,6 +34,7 @@ static void update_tempo(void)
     else             lv_label_set_text(w.bpm, "-- BPM");
     lv_obj_set_style_bg_color(w.bpm_led,
         lv_color_hex(r->tempo_on ? UI_COL_DIST : 0x3a3e44), 0);
+    ui_fs_badge_set(w.bpm_fs, kp_fs_mask_tap());
 }
 
 static void update_rig(void)
@@ -57,7 +59,7 @@ static void update_rig(void)
 static void refresh(uint32_t chg)
 {
     if (chg & (KP_CHG_RIG | KP_CHG_SYSTEM | KP_CHG_NAMES)) update_rig();
-    if (chg & (KP_CHG_TEMPO | KP_CHG_RIG))  update_tempo();
+    if (chg & (KP_CHG_TEMPO | KP_CHG_RIG | KP_CHG_SYSTEM)) update_tempo();
     if (chg & (KP_CHG_MODULES | KP_CHG_RIG | KP_CHG_FIXED | KP_CHG_PARAMS | KP_CHG_SYSTEM))
         ui_path_update(&w.path);
     ui_fsbar_update(&w.fs);
@@ -106,6 +108,8 @@ lv_obj_t * ui_live_build(void)
     lv_obj_move_to_index(w.bpm_led, 0);
     lv_obj_remove_flag(w.bpm_led, LV_OBJ_FLAG_CLICKABLE);
     ui_label(bpm, "TAP", UI_COL_TEXT3, &lv_font_montserrat_14);
+    w.bpm_fs = ui_fs_badge(bpm);
+    lv_obj_remove_flag(w.bpm_fs, LV_OBJ_FLAG_IGNORE_LAYOUT);   /* hinter "TAP" */
 
     lv_obj_t * edit = ui_button(head, "Bearbeiten", &lv_font_montserrat_18, false);
     lv_obj_set_style_text_color(edit, lv_color_hex(UI_COL_TEXT2), 0);

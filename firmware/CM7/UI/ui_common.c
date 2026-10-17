@@ -306,6 +306,38 @@ lv_obj_t * ui_title_bar(lv_obj_t * body, const char * title, ui_scr_t back_to)
     return row;
 }
 
+lv_obj_t * ui_fs_badge(lv_obj_t * parent)
+{
+    lv_obj_t * b = lv_label_create(parent);
+    lv_label_set_text(b, "");
+    lv_obj_set_style_text_font(b, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(b, lv_color_hex(UI_COL_BG), 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(0xdfe3e8), 0);
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(b, 4, 0);
+    lv_obj_set_style_pad_hor(b, 4, 0);
+    lv_obj_set_style_pad_ver(b, 1, 0);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_remove_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(b, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    lv_obj_set_hidden(b, true);
+    return b;
+}
+
+void ui_fs_badge_set(lv_obj_t * badge, uint8_t mask)
+{
+    char buf[16] = "FS";
+    uint32_t n = 2;
+    for (uint8_t i = 0; i < KP_FOOTSWITCHES && n + 3 < sizeof(buf); i++) {
+        if (!(mask & (1u << i))) continue;
+        if (n > 2) buf[n++] = '+';
+        buf[n++] = (char)('1' + i);
+    }
+    buf[n] = '\0';
+    lv_label_set_text(badge, buf);
+    lv_obj_set_hidden(badge, mask == 0);
+}
+
 /* ------------------------------------------------------------------------
  * Effektkette
  * --------------------------------------------------------------------- */
@@ -340,6 +372,7 @@ void ui_chain_create(ui_chain_t * c, lv_obj_t * parent, bool compact,
         lv_label_set_long_mode(c->name[i], LV_LABEL_LONG_WRAP);
         c->state[i] = ui_label(t, "", UI_COL_TEXT3,
                                compact ? &lv_font_montserrat_16 : &lv_font_montserrat_20);
+        c->fs[i] = ui_fs_badge(t);
     }
     ui_chain_update(c);
 }
@@ -382,6 +415,7 @@ void ui_chain_update(ui_chain_t * c)
         lv_obj_set_style_text_color(c->slot[i], lv_color_hex(scol), 0);
         lv_obj_set_style_text_color(c->state[i], lv_color_hex(scol), 0);
         lv_obj_set_style_text_color(c->name[i], lv_color_hex(ncol), 0);
+        ui_fs_badge_set(c->fs[i], c->id[i] == KP_CHAIN_STACK ? 0 : kp_fs_mask_module((kp_mod_t)c->id[i]));
     }
 }
 
@@ -519,6 +553,9 @@ void ui_path_create(ui_path_t * p, lv_obj_t * parent, int32_t th)
     lv_obj_set_style_bg_opa(p->tr_led, LV_OPA_COVER, 0);
     lv_obj_align(p->tr_led, LV_ALIGN_TOP_RIGHT, 0, 2);
     lv_obj_remove_flag(p->tr_led, LV_OBJ_FLAG_CLICKABLE);
+    /* Schild unter dem Feld (im Feld waere kein Platz) */
+    p->tr_fs = ui_fs_badge(box);
+    lv_obj_align(p->tr_fs, LV_ALIGN_TOP_LEFT, PATH_TR_X, y1 + PATH_TR_H / 2 + 4);
     p->tr = tr;
 
     for (uint8_t i = 0; i < p->n; i++) {
@@ -551,6 +588,7 @@ void ui_path_create(ui_path_t * p, lv_obj_t * parent, int32_t th)
         p->state[i] = ui_label(t, "", UI_COL_TEXT3, &lv_font_montserrat_14);
         lv_obj_set_size(p->state[i], LV_PCT(100), lv_font_get_line_height(&lv_font_montserrat_14));
         lv_label_set_long_mode(p->state[i], LV_LABEL_LONG_DOT);
+        p->fs[i] = ui_fs_badge(t);
 
         /* Pfeil im Abstand vor der Kachel (nicht vor der ersten einer Zeile) */
         if (col > 0) path_arrow(box, LV_SYMBOL_RIGHT, x - PATH_GAP / 2, row2 ? y2 : y1);
@@ -605,6 +643,8 @@ void ui_path_update(ui_path_t * p)
         lv_obj_set_style_text_color(p->slot[i], lv_color_hex(scol), 0);
         lv_obj_set_style_text_color(p->state[i], lv_color_hex(scol), 0);
         lv_obj_set_style_text_color(p->name[i], lv_color_hex(ncol), 0);
+        ui_fs_badge_set(p->fs[i], p->kind[i] == PE_FIXED ? kp_fs_mask_fixed((kp_fixed_t)p->id[i]) :
+                                  p->kind[i] == PE_MOD   ? kp_fs_mask_module((kp_mod_t)p->id[i]) : 0);
     }
 
     /* Transpose */
@@ -616,6 +656,7 @@ void ui_path_update(ui_path_t * p)
     lv_obj_set_style_text_color(p->tr_val, lv_color_hex(st == 1 ? UI_COL_TEXT : UI_COL_TEXT3), 0);
     lv_obj_set_style_border_color(p->tr, lv_color_hex(st == 1 ? cc : UI_COL_LINE), 0);
     lv_obj_set_style_bg_color(p->tr_led, lv_color_hex(st == 1 ? cc : (st == 0 ? 0x3a3e44 : UI_COL_TILE)), 0);
+    ui_fs_badge_set(p->tr_fs, kp_fs_mask_fixed(KP_FIX_TRANSPOSE));
 }
 
 /* ------------------------------------------------------------------------
@@ -658,6 +699,9 @@ static void fixed_chip(ui_fixed_row_t * f, lv_obj_t * row, kp_fixed_t i)
     f->chip[i] = b;
     f->led[i] = led;
     f->txt[i] = ui_label(b, FIX_SHORT[i], UI_COL_TEXT3, &lv_font_montserrat_14);
+    /* hier im Fluss hinter dem Namen statt unten rechts */
+    f->fs[i] = ui_fs_badge(b);
+    lv_obj_remove_flag(f->fs[i], LV_OBJ_FLAG_IGNORE_LAYOUT);
 }
 
 void ui_fixed_create(ui_fixed_row_t * f, lv_obj_t * parent)
@@ -681,6 +725,7 @@ void ui_fixed_update(ui_fixed_row_t * f)
         lv_obj_set_style_border_width(f->led[i], st < 0 ? 1 : 0, 0);
         lv_obj_set_style_border_color(f->led[i], lv_color_hex(COL_DIM), 0);
         lv_obj_set_style_text_color(f->txt[i], lv_color_hex(st == 1 ? UI_COL_TEXT : UI_COL_TEXT3), 0);
+        ui_fs_badge_set(f->fs[i], kp_fs_mask_fixed((kp_fixed_t)i));
     }
 }
 
@@ -730,6 +775,16 @@ void ui_fsbar_create(ui_fsbar_t * f, lv_obj_t * parent)
         lv_obj_add_flag(f->led[i], LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_align(f->led[i], LV_ALIGN_TOP_RIGHT, 0, 2);
         lv_obj_remove_flag(f->led[i], LV_OBJ_FLAG_CLICKABLE);
+
+        /* Farbstreifen links: Farbe des Effekts, den dieser FS schaltet */
+        f->stripe[i] = lv_obj_create(b);
+        lv_obj_remove_style_all(f->stripe[i]);
+        lv_obj_set_size(f->stripe[i], 5, 60);
+        lv_obj_set_style_radius(f->stripe[i], 3, 0);
+        lv_obj_set_style_bg_opa(f->stripe[i], LV_OPA_COVER, 0);
+        lv_obj_add_flag(f->stripe[i], LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_align(f->stripe[i], LV_ALIGN_LEFT_MID, -9, 0);
+        lv_obj_remove_flag(f->stripe[i], LV_OBJ_FLAG_CLICKABLE);
     }
     ui_fsbar_update(f);
 }
@@ -739,7 +794,18 @@ void ui_fsbar_update(ui_fsbar_t * f)
     kp_fs_info_t in;
     for (uint8_t i = 0; i < KP_FOOTSWITCHES; i++) {
         kp_fs_info(i, &in);
-        lv_label_set_text(f->top[i], in.top);
+        /* "FS5  BOOST": Nummer wie auf dem Schild der Effektkachel */
+        if (in.tag[0]) lv_label_set_text_fmt(f->top[i], "%s   %s", in.top, in.tag);
+        else           lv_label_set_text(f->top[i], in.top);
+        lv_obj_set_style_text_color(f->top[i], lv_color_hex(in.color ? in.color : UI_COL_TEXT3), 0);
+        if (in.color) {
+            lv_obj_set_hidden(f->stripe[i], false);
+            /* aus: gedaempft, an: volle Farbe */
+            lv_obj_set_style_bg_color(f->stripe[i], in.active ? lv_color_hex(in.color)
+                : lv_color_mix(lv_color_hex(in.color), lv_color_hex(UI_COL_TILE), 110), 0);
+        } else {
+            lv_obj_set_hidden(f->stripe[i], true);
+        }
         lv_label_set_text(f->main[i], in.main);
         lv_label_set_text(f->sub[i], in.sub);
         lv_obj_set_style_text_color(f->main[i],

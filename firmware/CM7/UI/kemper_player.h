@@ -218,6 +218,8 @@ typedef struct {
     bool     active;             /* hervorgehoben (geladenes Rig, Effekt an) */
     bool     empty;              /* nichts zugewiesen / leer */
     uint32_t led;                /* Farbe der LED, 0 = keine */
+    uint32_t color;              /* Farbe des geschalteten Effekts (auch wenn aus), 0 = keine */
+    char     tag[8];             /* Kurzname des Effekts, z. B. "BOOST", "A+DLY" */
 } kp_fs_info_t;
 
 /* Auf dem Display gespeicherte Einstellungen eines Rig-Platzes */
@@ -351,6 +353,11 @@ kp_fs_mode_t kp_fs_mode(void);
 void        kp_fs_set_mode(kp_fs_mode_t mode);
 void        kp_fs_info(uint8_t idx, kp_fs_info_t * out);
 kp_fs_assign_t kp_fs_assign(uint8_t idx);
+/* Footswitches (Bit 0 = FS1), die ein Modul / einen Fixed Effect / Tap schalten;
+ * Module auch ueber einen zugewiesenen Effect Button */
+uint8_t     kp_fs_mask_module(kp_mod_t m);
+uint8_t     kp_fs_mask_fixed(kp_fixed_t f);
+uint8_t     kp_fs_mask_tap(void);
 void        kp_fs_set_assign(uint8_t idx, kp_fs_assign_t a);
 /* Beschriftung einer Belegung, z. B. "Effect Button II", "Noise Gate" */
 const char *kp_fs_assign_name(kp_fs_assign_t a);
