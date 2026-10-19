@@ -107,7 +107,7 @@
 #define FX_ON                  0x03U
 
 /* Seiten der Effekt-Slots, Index = kp_mod_t */
-static const uint8_t SLOT_PAGE[KL_SLOTS] = { 0x32, 0x33, 0x34, 0x35, 0x38, 0x3A, 0x3C, 0x3D };
+#define SLOT_PAGE(m)           kp_module_page((kp_mod_t)(m))
 
 #define MIDI_CH                0x00U   /* Kanal 1 fuer Program Change an den Kemper */
 #define CC_BANK_LSB            32U
@@ -282,8 +282,8 @@ static void request_fx(void)
 {
     if (txq_free() < 2U * KL_SLOTS + KL_FIXED + 4U) return;   /* naechstes Mal */
     for (uint8_t m = 0; m < KL_SLOTS; m++) {
-        request_param(SLOT_PAGE[m], FX_TYPE);
-        request_param(SLOT_PAGE[m], FX_ON);
+        request_param(SLOT_PAGE(m), FX_TYPE);
+        request_param(SLOT_PAGE(m), FX_ON);
     }
     for (uint8_t f = 0; f < KL_FIXED; f++) request_param(KP_FIXED_PAGE, kp_fixed_nr((kp_fixed_t)f));
 }
@@ -465,7 +465,7 @@ static void handle_identity(const uint8_t * d, uint16_t n)
  * --------------------------------------------------------------------- */
 static int8_t slot_of_page(uint8_t page)
 {
-    for (uint8_t m = 0; m < KL_SLOTS; m++) if (SLOT_PAGE[m] == page) return (int8_t)m;
+    for (uint8_t m = 0; m < KL_SLOTS; m++) if (SLOT_PAGE(m) == page) return (int8_t)m;
     return -1;
 }
 
@@ -484,7 +484,7 @@ static void watch_setup(void)
     w.watch_kind = (uint8_t)(watch_cur >> 8);
     w.watch_idx = (uint8_t)(watch_cur & 0xFFU);
     if (w.watch_kind == KL_WATCH_SLOT && w.watch_idx < KL_SLOTS) {
-        watch_page = SLOT_PAGE[w.watch_idx];
+        watch_page = SLOT_PAGE(w.watch_idx);
         watch_for_type = w.slot_type[w.watch_idx];
         watch_typed = (w.slot_type_valid & (1U << w.watch_idx)) != 0U;
         if (watch_typed) n = kp_fx_params(watch_for_type, &list);
@@ -941,12 +941,12 @@ static void set_push(uint8_t page, uint8_t nr, uint16_t v)
 /* Ersetzen die schwachen Fassungen in kemper_player.c (LVGL-Task) */
 void kp_link_module_on(kp_mod_t m, bool on)
 {
-    if (m < KL_SLOTS && kp_connected()) set_push(SLOT_PAGE[m], FX_ON, on ? 1U : 0U);
+    if (m < KL_SLOTS && kp_connected()) set_push(SLOT_PAGE(m), FX_ON, on ? 1U : 0U);
 }
 
 void kp_link_module_type(kp_mod_t m, uint16_t type)
 {
-    if (m < KL_SLOTS && kp_connected()) set_push(SLOT_PAGE[m], FX_TYPE, type);
+    if (m < KL_SLOTS && kp_connected()) set_push(SLOT_PAGE(m), FX_TYPE, type);
 }
 
 void kp_link_fixed(kp_fixed_t f, bool on)

@@ -274,6 +274,11 @@ bool        kp_module_available(kp_mod_t m);
 /* Signalkette fuer die Anzeige, mit KP_CHAIN_STACK in der Mitte */
 uint8_t     kp_chain(uint8_t out[KP_CHAIN_MAX]);
 const char *kp_module_name(kp_mod_t m);         /* "A", "B", ..., "REV" */
+/* NRPN-Seite des Slots (Einstellungen des Effekts; const, aus jedem Task) */
+uint8_t     kp_module_page(kp_mod_t m);
+/* Eine Einstellung des Effekts im Modul wurde am Display geaendert
+ * (der Wert selbst geht ueber kemper_link_set_param() an den Kemper) */
+void        kp_module_param_changed(kp_mod_t m);
 
 /* Effektkatalog */
 uint8_t            kp_effect_count(void);       /* inkl. Eintrag 0 = leer */

@@ -127,14 +127,16 @@ static const kp_effect_t EFFECTS[] = {
 
 /* ------------------------------------------------------------------------
  * Einstellungen je Effektart (NRPN-Nummern der Stomp-Seiten laut Kemper
- * "MIDI Parameter Documentation"; Delay/Reverb-Mix laut PySwitch)
+ * "MIDI Parameter Documentation"; Delay/Reverb-Mix laut PySwitch).
+ * Dritter Wert: Auswahl mit so vielen Stufen (Anzahl nicht dokumentiert,
+ * aus dem Rig Manager; der Kemper begrenzt selbst), sonst stufenlos.
  * --------------------------------------------------------------------- */
 #define P_MIX     { 4,  "Mix" }
 #define P_VOLUME  { 6,  "Volume" }
 #define P_DUCKING { 53, "Ducking" }
 static const kp_fx_param_t FXP_WAH[] = {
     { 8, "Manual" }, { 9, "Peak" }, { 10, "Range" }, { 52, "Peak Range" },
-    { 12, "Pedal Mode" }, { 13, "Touch Attack" }, { 14, "Touch Release" },
+    { 12, "Pedal Mode", 6 }, { 13, "Touch Attack" }, { 14, "Touch Release" },
     { 15, "Touch Boost" }, P_MIX, P_VOLUME, P_DUCKING,
 };
 static const kp_fx_param_t FXP_DIST[]  = { { 16, "Drive" }, { 17, "Tone" }, P_MIX, P_VOLUME, P_DUCKING };
@@ -145,7 +147,7 @@ static const kp_fx_param_t FXP_COMP[]  = {
 static const kp_fx_param_t FXP_GATE[]  = { { 18, "Threshold" }, P_MIX, P_VOLUME };
 static const kp_fx_param_t FXP_MOD[]   = {
     { 20, "Rate" }, { 21, "Depth" }, { 22, "Feedback" }, { 23, "Crossover" },
-    { 24, "Hyper Amount" }, { 25, "Manual" }, { 26, "Peak Spread" }, { 27, "Stages" },
+    { 24, "Hyper Amount" }, { 25, "Manual" }, { 26, "Peak Spread" }, { 27, "Stages", 6 },
     P_MIX, P_VOLUME, P_DUCKING,
 };
 static const kp_fx_param_t FXP_ROTARY[] = {
@@ -164,10 +166,10 @@ static const kp_fx_param_t FXP_SEQ[] = {
 static const kp_fx_param_t FXP_EQ[] = { P_MIX, P_VOLUME, { 7, "Stereo" }, { 67, "Low Cut" }, { 68, "High Cut" } };
 static const kp_fx_param_t FXP_PITCH[] = {
     { 55, "Voice Mix" }, { 56, "Voice 1 Pitch" }, { 57, "Voice 2 Pitch" }, { 58, "Detune" },
-    { 64, "Key" }, { 60, "Smooth Chords" }, { 61, "Pure Tuning" }, P_MIX, P_VOLUME, P_DUCKING,
+    { 64, "Key", 12 }, { 60, "Smooth Chords", 2 }, { 61, "Pure Tuning", 2 }, P_MIX, P_VOLUME, P_DUCKING,
 };
 static const kp_fx_param_t FXP_DELAY[] = {
-    { 69, "Mix" }, { 71, "Time" }, { 76, "Note Value" }, { 80, "To Tempo" },
+    { 69, "Mix" }, { 71, "Time" }, { 76, "Note Value", 20 }, { 80, "To Tempo", 2 },
     { 93, "Feedback" }, { 98, "Low Cut" }, { 99, "High Cut" }, { 101, "Modulation" },
     { 102, "Chorus" }, P_DUCKING, P_VOLUME,
 };
@@ -228,6 +230,9 @@ static const uint32_t CAT_COLOR[KP_CAT_COUNT] = {
     0x2fb3a0,   /* Reverb  gruen  */
     0xb8bec7,   /* Looper  grau   */
 };
+
+/* NRPN-Seiten der Effekt-Slots A, B, C, D, X, MOD, DLY, REV */
+static const uint8_t MOD_PAGE[KP_MOD_COUNT] = { 0x32, 0x33, 0x34, 0x35, 0x38, 0x3A, 0x3C, 0x3D };
 
 static const char * const MOD_NAME[KP_MOD_COUNT] = {
     "A", "B", "C", "D", "X", "MOD", "DLY", "REV"
@@ -544,6 +549,18 @@ uint8_t kp_chain(uint8_t out[KP_CHAIN_MAX])
     for (int m = KP_MOD_X; m <= KP_MOD_REV; m++)
         if (kp_module_available((kp_mod_t)m)) out[n++] = (uint8_t)m;
     return n;
+}
+
+uint8_t kp_module_page(kp_mod_t m)
+{
+    return m < KP_MOD_COUNT ? MOD_PAGE[m] : 0;
+}
+
+void kp_module_param_changed(kp_mod_t m)
+{
+    if (m >= KP_MOD_COUNT) return;
+    mark_edited();
+    notify(KP_CHG_RIG);
 }
 
 const char * kp_module_name(kp_mod_t m)

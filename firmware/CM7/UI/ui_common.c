@@ -976,9 +976,12 @@ void ui_param_dialog(kp_section_t sec)
 static struct {
     kl_watch_t kind;
     uint8_t    idx;
-    bool       edit;                     /* Werte einstellbar (Fixed Effects) */
+    bool       edit;                     /* Werte einstellbar */
     const kp_fx_param_t * list;
     uint8_t    n;
+    uint8_t    page;                     /* NRPN-Seite (Slot bzw. Fixed Effects) */
+    uint16_t   type;                     /* Effekttyp im Slot beim Aufbau */
+    char       title[32];
     lv_obj_t * name;
     lv_obj_t * state;
     lv_obj_t * sw;
@@ -991,6 +994,8 @@ static struct {
     uint32_t   sent_at[KL_WATCH_MAX];
     lv_obj_t * msg;
 } fd;
+
+static void fx_dialog_open(const char * title, kl_watch_t kind, uint8_t idx);
 
 static void fx_dialog_close(void)
 {
@@ -1008,7 +1013,8 @@ static void fd_send(uint8_t k, uint16_t v)
     fd.raw[k] = v;
     fd.raw_ok |= (uint16_t)(1U << k);
     fd.sent_at[k] = lv_tick_get();
-    kemper_link_set_param(KP_FIXED_PAGE, fd.list[k].nr, v);
+    kemper_link_set_param(fd.page, fd.list[k].nr, v);
+    if (fd.kind == KL_WATCH_SLOT) kp_module_param_changed((kp_mod_t)fd.idx);   /* "bearbeitet" */
 }
 
 static void fd_slider_cb(lv_event_t * e)
@@ -1055,6 +1061,11 @@ static void fx_dialog_refresh(uint32_t chg)
     bool empty = false;
     if (fd.kind == KL_WATCH_SLOT) {
         const kp_module_t * m = &kp_rig()->mod[fd.idx];
+        if (m->type != fd.type) {
+            /* anderer Effekt im Slot: andere Einstellungen, Dialog neu aufbauen */
+            fx_dialog_open(fd.title, KL_WATCH_SLOT, fd.idx);
+            return;
+        }
         empty = m->type == 0;
         nm = empty ? "leer" : kp_module_fx_name((kp_mod_t)fd.idx);
         col = empty ? UI_COL_TEXT3 : kp_cat_color(kp_effect_cat(m->type));
@@ -1076,6 +1087,7 @@ static void fx_dialog_refresh(uint32_t chg)
     /* Werte */
     const bool mine = i.watch_kind == (uint8_t)fd.kind && i.watch_idx == fd.idx;
     const uint8_t n = mine ? i.watch_n : 0;
+    const bool same_list = n == fd.n;           /* Liste des Link-Tasks passt zu den Reglern */
     for (uint8_t k = 0; k < KL_WATCH_MAX; k++) {
         const bool has = k < n && (i.watch_valid & (1U << k));
         lv_obj_set_hidden(fd.item[k], k >= n);
@@ -1083,7 +1095,7 @@ static void fx_dialog_refresh(uint32_t chg)
         lv_label_set_text(fd.key[k], i.watch_name[k] ? i.watch_name[k] : "");
         lv_label_set_text(fd.val[k], has ? i.watch_txt[k] : "...");
         /* Rohwert uebernehmen, ausser waehrend gezogen wird oder kurz nach dem Senden */
-        if (fd.edit && k < fd.n && (i.watch_raw_valid & (1U << k)) &&
+        if (fd.edit && same_list && k < fd.n && (i.watch_raw_valid & (1U << k)) &&
             lv_tick_elaps(fd.sent_at[k]) > 400U &&
             !(fd.slider[k] && lv_obj_has_state(fd.slider[k], LV_STATE_PRESSED))) {
             fd.raw[k] = i.watch_raw[k];
@@ -1114,13 +1126,25 @@ static lv_obj_t * fd_small_btn(lv_obj_t * parent, const char * sym, uint8_t k, b
 static void fx_dialog_open(const char * title, kl_watch_t kind, uint8_t idx)
 {
     lv_obj_t * c;
+    char t[sizeof(fd.title)];
+    lv_snprintf(t, sizeof(t), "%s", title);      /* title kann fd.title sein */
     memset(&fd, 0, sizeof(fd));
+    lv_snprintf(fd.title, sizeof(fd.title), "%s", t);
     if (kind == KL_WATCH_FIXED) {
-        fd.edit = true;
+        fd.page = KP_FIXED_PAGE;
         fd.n = kp_fixed_params((kp_fixed_t)idx, &fd.list);
-        if (fd.n > KL_WATCH_MAX) fd.n = KL_WATCH_MAX;
+    } else {
+        fd.page = kp_module_page((kp_mod_t)idx);
+        fd.type = kp_rig()->mod[idx].type;
+        fd.n = fd.type ? kp_fx_params(fd.type, &fd.list) : 0;
     }
-    ui_dialog_open(title, 880, fd.edit ? 200 + fd.n * 72 : 520, &c);
+    if (fd.n > KL_WATCH_MAX) fd.n = KL_WATCH_MAX;
+    fd.edit = fd.n > 0;
+    /* viele Werte: niedrigere Zeilen, der Inhalt scrollt */
+    const int32_t row_h = fd.n > 5 ? 54 : 64;
+    int32_t h = 200 + fd.n * (row_h + 8);
+    if (h > 580) h = 580;
+    ui_dialog_open(t, 900, fd.edit ? h : 420, &c);
     fd.kind = kind;
     fd.idx = idx;
 
@@ -1140,7 +1164,7 @@ static void fx_dialog_open(const char * title, kl_watch_t kind, uint8_t idx)
     for (uint8_t k = 0; k < KL_WATCH_MAX; k++) {
         const bool ed = fd.edit && k < fd.n;
         lv_obj_t * it = ui_panel(grid);
-        lv_obj_set_size(it, ed ? LV_PCT(100) : 404, ed ? 64 : 46);
+        lv_obj_set_size(it, ed ? LV_PCT(100) : 404, ed ? row_h : 46);
         lv_obj_set_flex_flow(it, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(it, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_ver(it, 0, 0);
@@ -1152,7 +1176,7 @@ static void fx_dialog_open(const char * title, kl_watch_t kind, uint8_t idx)
         lv_label_set_long_mode(fd.key[k], LV_LABEL_LONG_DOT);
         if (ed) {
             /* einstellbar: Name | - | Regler | + | Wert */
-            lv_obj_set_width(fd.key[k], 150);
+            lv_obj_set_width(fd.key[k], 170);
             fd_small_btn(it, LV_SYMBOL_MINUS, k, false);
             if (!fd.list[k].steps) {
                 fd.slider[k] = ui_slider(it, 0, KP_FX_RAW_MAX, 0);
@@ -1169,6 +1193,7 @@ static void fx_dialog_open(const char * title, kl_watch_t kind, uint8_t idx)
             }
             fd_small_btn(it, LV_SYMBOL_PLUS, k, true);
             if (!fd.list[k].steps) lv_obj_move_to_index(fd.val[k], -1);   /* Wert ganz rechts */
+            else                   ui_spacer(it, 120, 1, false);          /* "+" buendig mit den Reglern */
         } else {
             lv_obj_set_width(fd.key[k], 1);
             lv_obj_set_flex_grow(fd.key[k], 1);

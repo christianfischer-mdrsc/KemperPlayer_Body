@@ -18,9 +18,11 @@ Mit Kemper (Level I/II) und bei Level III mit allen Modulen (kleinere Kacheln). 
 
 ![Live-Ansicht Level III](docs/images/vorschau_live_level3.png)
 
-Fixed Effect halten → Werte einstellen; Transpose halten → Tonhöhe; Footswitch-Feld halten → Belegung:
+Effekt oder Fixed Effect halten → Werte einstellen; Transpose halten → Tonhöhe; Footswitch-Feld halten → Belegung:
 
 ![Fixed Effect einstellen](docs/images/vorschau_fixed_effect.png)
+
+![Modul einstellen](docs/images/vorschau_modul_einstellungen.png)
 
 ![Transpose](docs/images/vorschau_transpose.png)
 
@@ -84,9 +86,9 @@ Die Oberfläche bildet nur den **Kemper Profiler Player** ab: Banks mit je 5 Rig
 
 | Ansicht | Was funktioniert |
 |---|---|
-| **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht. Signalweg mit allen Effekten als Kacheln: antippen → ein/aus, **halten → Einstellungen** (Module: Werte live vom Kemper; Fixed Effects: Werte **einstellbar** per Regler und −/+). Transpose antippen → ein/aus, halten → Tonhöhe in Halbtönen (−36…+36). Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
+| **Live** | Bank wechseln (Pfeile), Bank antippen → Bank-Übersicht. Signalweg mit allen Effekten als Kacheln: antippen → ein/aus, **halten → Einstellungen**: alle Werte der Module A–REV und der Fixed Effects **einstellbar** per Regler und −/+ (Auswahlwerte wie Note Value nur −/+), angezeigt so, wie der Kemper sie darstellt. Transpose antippen → ein/aus, halten → Tonhöhe in Halbtönen (−36…+36). Tempo antippen → Tap Tempo, „bearbeitet“-Hinweis wie am Kemper |
 | **Footswitch-Leiste** | Antippen = Footswitch drücken, **halten = Belegung wählen**: jeder FS1–FS6 frei mit Effect Button I–IIII, einem Effekt-Modul, einem Fixed Effect, Tap Tempo oder nichts. Die Belegung gilt **pro Rig-Platz** (Bank/Rig) und wird auf der SD-Karte gespeichert; Rigs ohne eigene Belegung nutzen den Standard (im Dialog „Als Standard“ / „Standard verwenden“). Werksstandard: FS1–4 = Effect Button I–IIII, FS5 = Tap, FS6 frei. **Zuordnung sichtbar:** Jede Effektkachel (und der Tempo-Knopf), die ein Footswitch schaltet, trägt ein Schild „FS5“ (mehrere: „FS1+3“); das FS-Feld zeigt Nummer und Kurzname des Effekts in dessen Farbe und einen Farbstreifen (gedämpft = aus) |
-| **Bearbeiten** | Startseite (Haus-Symbol), Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons, Einstellungen; Modul halten → Einstellungen; Fixed Effects wie in Live; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
+| **Bearbeiten** | Startseite (Haus-Symbol), Modul antippen → Effekttyp, Ein/Aus, Zuweisung zu Effect Buttons, Einstellungen; Modul halten oder „Einstellungen“ → alle Werte des Effekts einstellen; Fixed Effects wie in Live; RIG/INPUT/AMP/EQ/CAB/OUTPUT → Regler; Rig umbenennen (Bildschirmtastatur); Morph; Tempo ein/aus, ± |
 | **Banks** | Banks seitenweise (je 10), Rig antippen → laden |
 | **Tuner** | Referenz 424–456 Hz, Stummschaltung; Ton und Abweichung kommen vom Kemper |
 | **System** | Player-Level I/II/III, Footswitch-Modus, **Helligkeit** (PWM), **Uhr stellen** (RTC), Info |
